@@ -3,8 +3,12 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
+import com.l8group.videoeditor.enums.VideoStatus;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -29,6 +33,10 @@ public class VideoFile {
 
     @Column(name = "uploaded_at", nullable = false)
     private ZonedDateTime uploadedAt;
+
+    @Enumerated(EnumType.STRING) 
+    @Column(name = "status", nullable = false)
+    private VideoStatus status;
 
     public UUID getId() {
         return id;
@@ -68,6 +76,14 @@ public class VideoFile {
 
     public void setUploadedAt(ZonedDateTime uploadedAt) {
         this.uploadedAt = uploadedAt;
+    }
+
+    public VideoStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(VideoStatus status) {
+        this.status = status;
     }
 
 }
