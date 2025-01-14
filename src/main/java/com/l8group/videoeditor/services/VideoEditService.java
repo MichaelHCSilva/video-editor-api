@@ -8,7 +8,6 @@ import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.utils.FFmpegUtils;
 
-import org.apache.commons.codec.digest.DigestUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -43,10 +42,8 @@ public class VideoEditService {
         VideoFile videoFile = videoFileRepository.findById(request.getVideoId())
                 .orElseThrow(() -> new IllegalArgumentException("Vídeo não encontrado para o ID fornecido."));
 
-        String hash = DigestUtils
-                .md5Hex(request.getVideoId().toString() + request.getStartTime() + request.getEndTime());
         Path videoPath = Paths.get(videoStoragePath, videoFile.getFileName());
-        Path outputPath = Paths.get(videoOutputPath, hash + ".mp4");
+        Path outputPath = Paths.get(videoOutputPath, videoFile.getFileName());  
 
         ffmpegUtils.cutVideo(videoPath.toFile(), outputPath.toFile(), request.getStartTime(), request.getEndTime());
 
@@ -54,8 +51,6 @@ public class VideoEditService {
         videoEdit.setVideoFile(videoFile);
         videoEdit.setStartTime(request.getStartTime());
         videoEdit.setEndTime(request.getEndTime());
-        videoEdit.setHash(hash);
-        videoEdit.setFilePath(outputPath.toString());
 
         VideoEdit savedVideoEdit = videoEditRepository.save(videoEdit);
 
@@ -68,8 +63,6 @@ public class VideoEditService {
         dto.setVideoId(videoEdit.getVideoFile().getId());
         dto.setStartTime(videoEdit.getStartTime());
         dto.setEndTime(videoEdit.getEndTime());
-        dto.setHash(videoEdit.getHash());
-        dto.setFilePath(videoEdit.getFilePath());
         return dto;
     }
 }

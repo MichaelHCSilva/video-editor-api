@@ -8,9 +8,7 @@ public class VideoEditDTO {
     private UUID videoId;
     private Long startTime;
     private Long endTime;
-    private String hash;
-    private String filePath;
-
+    
     public UUID getId() {
         return id;
     }
@@ -43,19 +41,4 @@ public class VideoEditDTO {
         this.endTime = endTime;
     }
 
-    public String getHash() {
-        return hash;
-    }
-
-    public void setHash(String hash) {
-        this.hash = hash;
-    }
-
-    public String getFilePath() {
-        return filePath;
-    }
-
-    public void setFilePath(String filePath) {
-        this.filePath = filePath;
-    }
 }

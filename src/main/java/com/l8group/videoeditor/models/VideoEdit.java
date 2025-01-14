@@ -22,14 +22,8 @@ public class VideoEdit {
     @Column(name = "end_time", nullable = false)
     private Long endTime;
 
-    @Column(name = "hash", nullable = false, unique = true)
-    private String hash;
-
-    @Column(name = "file_path", nullable = false)
-    private String filePath;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
-    private ZonedDateTime createdAt = ZonedDateTime.now();
+    @Column(name = "uploaded_at", nullable = false, updatable = false)
+    private ZonedDateTime uploadedAt = ZonedDateTime.now();
 
     public UUID getId() {
         return id;
@@ -63,27 +57,12 @@ public class VideoEdit {
         this.endTime = endTime;
     }
 
-    public String getHash() {
-        return hash;
+    public ZonedDateTime getUploadedAt() {
+        return uploadedAt;
     }
 
-    public void setHash(String hash) {
-        this.hash = hash;
+    public void setUploadedAt(ZonedDateTime uploadedAt) {
+        this.uploadedAt = uploadedAt;
     }
 
-    public String getFilePath() {
-        return filePath;
-    }
-
-    public void setFilePath(String filePath) {
-        this.filePath = filePath;
-    }
-
-    public ZonedDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(ZonedDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 }
