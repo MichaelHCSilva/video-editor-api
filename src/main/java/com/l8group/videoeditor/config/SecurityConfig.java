@@ -15,6 +15,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/videos").permitAll()
                 .requestMatchers("/api/videos/upload").permitAll()
+                .requestMatchers("/api/videos/edit/cut").permitAll()
                 .requestMatchers("/error").permitAll() 
                 .anyRequest().authenticated() 
             );

@@ -9,12 +9,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.l8group.videoeditor.dto.VideoEditDTO;
 import com.l8group.videoeditor.dto.VideoFileDTO;
+import com.l8group.videoeditor.requests.VideoCutRequest;
+import com.l8group.videoeditor.services.VideoEditService;
 import com.l8group.videoeditor.services.VideoUploadService;
 
 @RestController
@@ -25,6 +29,9 @@ public class VideoController {
 
     @Autowired
     private VideoUploadService videoUploadService;
+
+    @Autowired
+    private VideoEditService videoEditService;
 
     @PostMapping("/upload")
     public ResponseEntity<UUID> uploadVideo(@RequestParam("file") MultipartFile file) {
@@ -48,5 +55,15 @@ public class VideoController {
     public ResponseEntity<List<VideoFileDTO>> listarVideos() {
         List<VideoFileDTO> videoFileDTOs = videoUploadService.listarVideos();
         return ResponseEntity.ok(videoFileDTOs);
+    }
+
+    @PostMapping("/edit/cut")
+    public ResponseEntity<VideoEditDTO> cutVideo(@RequestBody VideoCutRequest request) {
+        try {
+            VideoEditDTO videoEditDTO = videoEditService.cutVideo(request);
+            return ResponseEntity.ok(videoEditDTO);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(null);
+        }
     }
 }

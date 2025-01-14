@@ -36,7 +36,6 @@ public class VideoUploadService {
 
         VideoFile videoFile = criarVideoFile(file);
 
-        // Obtenha a duração do vídeo usando FFmpeg
         long duration = ffmpegUtils.getVideoDuration(file);
         videoFile.setDuration(duration);
 
