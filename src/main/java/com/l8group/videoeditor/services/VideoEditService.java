@@ -1,5 +1,12 @@
 package com.l8group.videoeditor.services;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import com.l8group.videoeditor.dto.VideoEditDTO;
 import com.l8group.videoeditor.models.VideoEdit;
 import com.l8group.videoeditor.models.VideoFile;
@@ -7,13 +14,6 @@ import com.l8group.videoeditor.repositories.VideoEditRepository;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.utils.FFmpegUtils;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-
-import java.nio.file.Path;
-import java.nio.file.Paths;
 
 @Service
 public class VideoEditService {
@@ -43,14 +43,26 @@ public class VideoEditService {
                 .orElseThrow(() -> new IllegalArgumentException("Vídeo não encontrado para o ID fornecido."));
 
         Path videoPath = Paths.get(videoStoragePath, videoFile.getFileName());
-        Path outputPath = Paths.get(videoOutputPath, videoFile.getFileName());  
+        Path outputPath;
+
+        long duration = request.getEndTime() - request.getStartTime();
+
+        String originalFileName = videoFile.getFileName();
+        int dotIndex = originalFileName.lastIndexOf('.');
+
+        String baseName = dotIndex != -1 ? originalFileName.substring(0, dotIndex) : originalFileName;
+        String extension = dotIndex != -1 ? originalFileName.substring(dotIndex) : "";
+
+        String outputFileName = baseName + "_cut" + extension;
+
+        outputPath = Paths.get(videoOutputPath, outputFileName);
 
         ffmpegUtils.cutVideo(videoPath.toFile(), outputPath.toFile(), request.getStartTime(), request.getEndTime());
 
         VideoEdit videoEdit = new VideoEdit();
         videoEdit.setVideoFile(videoFile);
-        videoEdit.setStartTime(request.getStartTime());
-        videoEdit.setEndTime(request.getEndTime());
+        videoEdit.setDuration(duration);
+        videoEdit.setName(outputFileName);
 
         VideoEdit savedVideoEdit = videoEditRepository.save(videoEdit);
 
@@ -61,8 +73,9 @@ public class VideoEditService {
         VideoEditDTO dto = new VideoEditDTO();
         dto.setId(videoEdit.getId());
         dto.setVideoId(videoEdit.getVideoFile().getId());
-        dto.setStartTime(videoEdit.getStartTime());
-        dto.setEndTime(videoEdit.getEndTime());
+        dto.setDuration(videoEdit.getDuration());
+        dto.setName(videoEdit.getName());
+
         return dto;
     }
 }

@@ -1,8 +1,17 @@
 package com.l8group.videoeditor.models;
 
-import jakarta.persistence.*;
 import java.time.ZonedDateTime;
 import java.util.UUID;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "video_edits")
@@ -13,14 +22,14 @@ public class VideoEdit {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "video_id", nullable = false)
+    @JoinColumn(name = "video_id", nullable = false) 
     private VideoFile videoFile;
 
-    @Column(name = "start_time", nullable = false)
-    private Long startTime;
+    @Column(name = "duration", nullable = false)
+    private Long duration; 
 
-    @Column(name = "end_time", nullable = false)
-    private Long endTime;
+    @Column(name = "name", nullable = false)
+    private String name; 
 
     @Column(name = "uploaded_at", nullable = false, updatable = false)
     private ZonedDateTime uploadedAt = ZonedDateTime.now();
@@ -41,20 +50,20 @@ public class VideoEdit {
         this.videoFile = videoFile;
     }
 
-    public Long getStartTime() {
-        return startTime;
+    public Long getDuration() {
+        return duration;
     }
 
-    public void setStartTime(Long startTime) {
-        this.startTime = startTime;
+    public void setDuration(Long duration) {
+        this.duration = duration;
     }
 
-    public Long getEndTime() {
-        return endTime;
+    public String getName() {
+        return name;
     }
 
-    public void setEndTime(Long endTime) {
-        this.endTime = endTime;
+    public void setName(String name) {
+        this.name = name;
     }
 
     public ZonedDateTime getUploadedAt() {

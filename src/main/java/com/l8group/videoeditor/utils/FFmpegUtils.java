@@ -32,7 +32,7 @@ public class FFmpegUtils {
     public long getVideoDuration(MultipartFile file) {
         File tempFile = null;
         try {
-            tempFile = File.createTempFile("video", ".tmp");
+            tempFile = File.createTempFile("videos", ".tmp");
             file.transferTo(tempFile);
 
             FFmpegProbeResult probeResult = ffprobe.probe(tempFile.getAbsolutePath());
@@ -60,6 +60,12 @@ public class FFmpegUtils {
     }
 
     public void cutVideo(File inputFile, File outputFile, long startTime, long endTime) {
+        // Calcula a duração do vídeo cortado
+        long duration = endTime - startTime;
+        if (duration <= 0) {
+            throw new IllegalArgumentException("O tempo de corte é inválido. O tempo final deve ser maior que o tempo de início.");
+        }
+
         String inputPath = convertToLinuxPath(inputFile.getAbsolutePath());
         String outputPath = convertToLinuxPath(outputFile.getAbsolutePath());
 
@@ -88,6 +94,9 @@ public class FFmpegUtils {
             if (process.exitValue() != 0) {
                 throw new IllegalStateException("Erro ao cortar vídeo. Código de saída: " + process.exitValue());
             }
+
+            logger.info("Vídeo cortado com sucesso. Duração do vídeo cortado: {} segundos", duration);
+
         } catch (IOException e) {
             logger.error("Erro ao executar o comando FFmpeg.", e);
             throw new RuntimeException("Erro ao executar o comando FFmpeg: " + e.getMessage(), e);

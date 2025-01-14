@@ -6,9 +6,9 @@ public class VideoEditDTO {
 
     private UUID id;
     private UUID videoId;
-    private Long startTime;
-    private Long endTime;
-    
+    private Long duration; // Duração do vídeo
+    private String name;   // Nome do vídeo editado
+
     public UUID getId() {
         return id;
     }
@@ -25,20 +25,20 @@ public class VideoEditDTO {
         this.videoId = videoId;
     }
 
-    public Long getStartTime() {
-        return startTime;
+    public Long getDuration() {
+        return duration;
     }
 
-    public void setStartTime(Long startTime) {
-        this.startTime = startTime;
+    public void setDuration(Long duration) {
+        this.duration = duration;
     }
 
-    public Long getEndTime() {
-        return endTime;
+    public String getName() {
+        return name;
     }
 
-    public void setEndTime(Long endTime) {
-        this.endTime = endTime;
+    public void setName(String name) {
+        this.name = name;
     }
 
 }
