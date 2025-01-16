@@ -38,10 +38,6 @@ public class VideoFile {
     @Column(name = "status", nullable = false)
     private VideoStatus status;
 
-    @Column(name = "duration", nullable = false)
-    private Long duration; 
-
-    
     public UUID getId() {
         return id;
     }
@@ -90,12 +86,5 @@ public class VideoFile {
         this.status = status;
     }
 
-    public Long getDuration() {
-        return duration;
-    }
-
-    public void setDuration(Long duration) {
-        this.duration = duration;
-    }
 
 }

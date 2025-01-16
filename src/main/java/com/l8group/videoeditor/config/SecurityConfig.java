@@ -11,13 +11,14 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-        .csrf(csrf -> csrf.disable())
+            .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/").permitAll()  // Permite acesso à raiz
                 .requestMatchers("/api/videos").permitAll()
                 .requestMatchers("/api/videos/upload").permitAll()
                 .requestMatchers("/api/videos/edit/cut").permitAll()
                 .requestMatchers("/error").permitAll() 
-                .anyRequest().authenticated() 
+                .anyRequest().authenticated()  // Exige autenticação para todas as outras requisições
             );
         return http.build();
     }
