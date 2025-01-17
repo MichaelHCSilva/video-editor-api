@@ -1,10 +1,5 @@
 package com.l8group.videoeditor.services;
 
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,6 +9,11 @@ import com.l8group.videoeditor.dtos.VideoFileDTO;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
+
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 public class VideoFileService {
@@ -28,36 +28,51 @@ public class VideoFileService {
 
     public List<UUID> uploadVideos(MultipartFile[] files, List<String> rejectedFiles) {
         List<UUID> videoIds = new ArrayList<>();
-
+    
         for (MultipartFile file : files) {
             try {
+                // Verifica se o arquivo está vazio
+                if (file.isEmpty()) {
+                    throw new IllegalArgumentException(
+                            "O arquivo " + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "desconhecido")
+                                    + " está vazio. Por favor, envie um arquivo válido.");
+                }
+    
                 UUID videoId = uploadVideo(file);
                 videoIds.add(videoId);
+                logger.info("Arquivo processado com sucesso: {}", file.getOriginalFilename());
             } catch (IllegalArgumentException e) {
-                rejectedFiles.add(file.getOriginalFilename());
+                // Loga a mensagem no console do VS Code
                 logger.warn("Arquivo rejeitado: {}. Motivo: {}", file.getOriginalFilename(), e.getMessage());
+    
+                // Adiciona o nome do arquivo rejeitado à lista
+                rejectedFiles.add(file.getOriginalFilename() != null ? file.getOriginalFilename() : "Arquivo desconhecido");
             }
         }
-
+    
         return videoIds;
     }
+    
 
     public UUID uploadVideo(MultipartFile file) {
         String fileFormat = getFileExtension(file.getOriginalFilename());
 
-        // Verifica se o formato é suportado
         if (!isSupportedFormat(fileFormat)) {
-            throw new IllegalArgumentException("Formato inválido. Somente os formatos mp4, avi e mov são permitidos.");
+            throw new IllegalArgumentException(
+                    "Formato inválido. O formato do arquivo enviado (" + fileFormat
+                            + ") não é suportado. Formatos aceitos: mp4, avi, mov.");
         }
 
-        // Verifica se o arquivo está vazio
         if (file.isEmpty()) {
-            throw new IllegalArgumentException("O arquivo está vazio ou corrompido.");
+            throw new IllegalArgumentException(
+                    "O arquivo " + file.getOriginalFilename()
+                            + " está vazio ou corrompido. Verifique e tente novamente.");
         }
 
-        // Valida o conteúdo do vídeo
         if (!isValidVideoContent(file)) {
-            throw new IllegalArgumentException("O vídeo está corrompido ou ilegível.");
+            throw new IllegalArgumentException(
+                    "O vídeo " + file.getOriginalFilename()
+                            + " está corrompido ou ilegível. Não é possível processá-lo.");
         }
 
         VideoFile videoFile = new VideoFile();
@@ -83,7 +98,6 @@ public class VideoFileService {
     }
 
     private boolean isSupportedFormat(String fileFormat) {
-        // Permite somente os formatos 'avi', 'mp4' e 'mov'
         return fileFormat.equalsIgnoreCase("mp4")
                 || fileFormat.equalsIgnoreCase("avi")
                 || fileFormat.equalsIgnoreCase("mov");
@@ -92,7 +106,7 @@ public class VideoFileService {
     private String getFileExtension(String fileName) {
         if (fileName == null || !fileName.contains(".")) {
             logger.error("Nome do arquivo inválido: {}", fileName);
-            throw new IllegalArgumentException("Nome do arquivo inválido.");
+            throw new IllegalArgumentException("O nome do arquivo é inválido ou não possui uma extensão válida.");
         }
         return fileName.substring(fileName.lastIndexOf('.') + 1);
     }

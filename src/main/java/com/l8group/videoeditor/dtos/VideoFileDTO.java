@@ -10,7 +10,6 @@ public class VideoFileDTO {
     private ZonedDateTime uploadedAt;
     private VideoStatus status;
 
-    // Construtor
     public VideoFileDTO(String fileName, ZonedDateTime uploadedAt, VideoStatus status) {
         this.fileName = fileName;
         this.uploadedAt = uploadedAt;
@@ -40,4 +39,5 @@ public class VideoFileDTO {
     public void setStatus(VideoStatus status) {
         this.status = status;
     }
+
 }
