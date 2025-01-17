@@ -4,14 +4,13 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.l8group.videoeditor.dtos.VideoFileDTO;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
@@ -27,69 +26,64 @@ public class VideoFileService {
         this.videoFileRepository = videoFileRepository;
     }
 
-    public List<UUID> uploadVideos(MultipartFile[] files) {
+    public List<UUID> uploadVideos(MultipartFile[] files, List<String> rejectedFiles) {
         List<UUID> videoIds = new ArrayList<>();
-        for (MultipartFile file : files) {
-            UUID videoId = uploadVideo(file);
-            videoIds.add(videoId);
-        }
-        return videoIds;
-    }
 
-    @Async
-    public CompletableFuture<UUID> uploadVideoAsync(MultipartFile file) {
-        return CompletableFuture.supplyAsync(() -> uploadVideo(file));
+        for (MultipartFile file : files) {
+            try {
+                UUID videoId = uploadVideo(file);
+                videoIds.add(videoId);
+            } catch (IllegalArgumentException e) {
+                rejectedFiles.add(file.getOriginalFilename());
+                logger.warn("Arquivo rejeitado: {}. Motivo: {}", file.getOriginalFilename(), e.getMessage());
+            }
+        }
+
+        return videoIds;
     }
 
     public UUID uploadVideo(MultipartFile file) {
         String fileFormat = getFileExtension(file.getOriginalFilename());
+
+        // Verifica se o formato é suportado
         if (!isSupportedFormat(fileFormat)) {
-            logger.warn("Formato de arquivo não suportado: {}", fileFormat);
-            throw new IllegalArgumentException("Formato de arquivo não suportado.");
+            throw new IllegalArgumentException("Formato inválido. Somente os formatos mp4, avi e mov são permitidos.");
         }
 
+        // Verifica se o arquivo está vazio
         if (file.isEmpty()) {
-            logger.warn("Arquivo vazio ou corrompido: {}", file.getOriginalFilename());
             throw new IllegalArgumentException("O arquivo está vazio ou corrompido.");
         }
 
-        String originalFileName = file.getOriginalFilename();
-
+        // Valida o conteúdo do vídeo
         if (!isValidVideoContent(file)) {
-            logger.warn("Vídeo inválido ou corrompido: {}", originalFileName);
             throw new IllegalArgumentException("O vídeo está corrompido ou ilegível.");
         }
 
         VideoFile videoFile = new VideoFile();
-        videoFile.setFileName(originalFileName);
+        videoFile.setFileName(file.getOriginalFilename());
         videoFile.setFileSize(file.getSize());
         videoFile.setFileFormat(fileFormat);
         videoFile.setUploadedAt(ZonedDateTime.now());
         videoFile.setStatus(VideoStatus.PROCESSING);
 
         VideoFile savedVideo = videoFileRepository.save(videoFile);
-        logger.info("Metadados do vídeo salvos com sucesso para o arquivo: {}", originalFileName);
+        logger.info("Metadados do vídeo salvos com sucesso para o arquivo: {}", file.getOriginalFilename());
 
         return savedVideo.getId();
     }
 
     private boolean isValidVideoContent(MultipartFile file) {
         try {
-
-            if (file.getSize() > 0) {
-                return true;
-            } else {
-                logger.warn("O arquivo está vazio ou corrompido.");
-                return false;
-            }
-
+            return file.getSize() > 0;
         } catch (Exception e) {
-            logger.error("Erro ao validar conteúdo do vídeo.", e);
-            return false;
+            logger.error("Erro ao validar conteúdo do vídeo: {}", e.getMessage(), e);
+            throw new IllegalArgumentException("Erro ao validar o conteúdo do vídeo.");
         }
     }
 
     private boolean isSupportedFormat(String fileFormat) {
+        // Permite somente os formatos 'avi', 'mp4' e 'mov'
         return fileFormat.equalsIgnoreCase("mp4")
                 || fileFormat.equalsIgnoreCase("avi")
                 || fileFormat.equalsIgnoreCase("mov");
@@ -101,5 +95,9 @@ public class VideoFileService {
             throw new IllegalArgumentException("Nome do arquivo inválido.");
         }
         return fileName.substring(fileName.lastIndexOf('.') + 1);
+    }
+
+    public List<VideoFileDTO> getAllVideos() {
+        return videoFileRepository.findAllVideos();
     }
 }
