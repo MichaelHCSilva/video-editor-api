@@ -9,7 +9,10 @@ import com.l8group.videoeditor.dtos.VideoFileDTO;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
+import com.l8group.videoeditor.utils.VideoDuration;
 
+import java.io.File;
+import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,75 +29,67 @@ public class VideoFileService {
         this.videoFileRepository = videoFileRepository;
     }
 
-    public List<UUID> uploadVideos(MultipartFile[] files, List<String> rejectedFiles) {
-        List<UUID> videoIds = new ArrayList<>();
-    
+    public List<UUID> uploadVideo(MultipartFile[] files, List<String> rejectedFiles) {
+        List<UUID> processedFiles = new ArrayList<>();
+
         for (MultipartFile file : files) {
-            try {
-                // Verifica se o arquivo está vazio
-                if (file.isEmpty()) {
-                    throw new IllegalArgumentException(
-                            "O arquivo " + (file.getOriginalFilename() != null ? file.getOriginalFilename() : "desconhecido")
-                                    + " está vazio. Por favor, envie um arquivo válido.");
+            String fileFormat = getFileExtension(file.getOriginalFilename());
+
+            if (!isSupportedFormat(fileFormat)) {
+                rejectedFiles.add(file.getOriginalFilename() + " (Formato inválido)");
+                
+            } else if (file.isEmpty()) {
+                rejectedFiles.add(file.getOriginalFilename() + " (Arquivo vazio)");
+              
+            } else if (!isValidVideoContent(file)) {
+                rejectedFiles.add(file.getOriginalFilename() + " (Arquivo corrompido ou ilegível)");
+           
+            } else {
+                try {
+                  
+                    String filePath = saveFile(file);  
+
+                    
+                    VideoFile videoFile = new VideoFile();
+                    videoFile.setFileName(file.getOriginalFilename());
+                    videoFile.setFileSize(file.getSize());
+                    videoFile.setFileFormat(fileFormat);
+                    videoFile.setUploadedAt(ZonedDateTime.now());
+                    videoFile.setStatus(VideoStatus.PROCESSING);
+
+                    
+                    Long videoDuration = VideoDuration.getVideoDurationInSeconds(filePath);
+                    videoFile.setDuration(videoDuration);
+
+                    
+                    videoFileRepository.save(videoFile);
+                    processedFiles.add(videoFile.getId());
+                    logger.info("Metadados do vídeo salvos com sucesso para o arquivo: {}", file.getOriginalFilename());
+                } catch (IOException | InterruptedException e) {
+                    logger.error("Erro ao processar o arquivo {}: {}", file.getOriginalFilename(), e.getMessage());
+                    rejectedFiles.add(file.getOriginalFilename() + " (Erro ao processar a duração)");
                 }
-    
-                UUID videoId = uploadVideo(file);
-                videoIds.add(videoId);
-                logger.info("Arquivo processado com sucesso: {}", file.getOriginalFilename());
-            } catch (IllegalArgumentException e) {
-                // Loga a mensagem no console do VS Code
-                logger.warn("Arquivo rejeitado: {}. Motivo: {}", file.getOriginalFilename(), e.getMessage());
-    
-                // Adiciona o nome do arquivo rejeitado à lista
-                rejectedFiles.add(file.getOriginalFilename() != null ? file.getOriginalFilename() : "Arquivo desconhecido");
             }
         }
-    
-        return videoIds;
-    }
-    
 
-    public UUID uploadVideo(MultipartFile file) {
-        String fileFormat = getFileExtension(file.getOriginalFilename());
-
-        if (!isSupportedFormat(fileFormat)) {
-            throw new IllegalArgumentException(
-                    "Formato inválido. O formato do arquivo enviado (" + fileFormat
-                            + ") não é suportado. Formatos aceitos: mp4, avi, mov.");
-        }
-
-        if (file.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "O arquivo " + file.getOriginalFilename()
-                            + " está vazio ou corrompido. Verifique e tente novamente.");
-        }
-
-        if (!isValidVideoContent(file)) {
-            throw new IllegalArgumentException(
-                    "O vídeo " + file.getOriginalFilename()
-                            + " está corrompido ou ilegível. Não é possível processá-lo.");
-        }
-
-        VideoFile videoFile = new VideoFile();
-        videoFile.setFileName(file.getOriginalFilename());
-        videoFile.setFileSize(file.getSize());
-        videoFile.setFileFormat(fileFormat);
-        videoFile.setUploadedAt(ZonedDateTime.now());
-        videoFile.setStatus(VideoStatus.PROCESSING);
-
-        VideoFile savedVideo = videoFileRepository.save(videoFile);
-        logger.info("Metadados do vídeo salvos com sucesso para o arquivo: {}", file.getOriginalFilename());
-
-        return savedVideo.getId();
+        return processedFiles;
     }
 
-    private boolean isValidVideoContent(MultipartFile file) {
-        try {
-            return file.getSize() > 0;
-        } catch (Exception e) {
-            logger.error("Erro ao validar conteúdo do vídeo: {}", e.getMessage(), e);
-            throw new IllegalArgumentException("Erro ao validar o conteúdo do vídeo.");
+    
+    private String saveFile(MultipartFile file) throws IOException {
+      
+        String uploadDir = "/mnt/c/Users/micha/OneDrive/Documentos/video-editor-api/videos/"; 
+        String filePath = uploadDir + file.getOriginalFilename();
+    
+        File directory = new File(uploadDir);
+        if (!directory.exists()) {
+            directory.mkdirs();
         }
+    
+        File destinationFile = new File(filePath);
+        file.transferTo(destinationFile);
+        
+        return filePath;  
     }
 
     private boolean isSupportedFormat(String fileFormat) {
@@ -109,6 +104,15 @@ public class VideoFileService {
             throw new IllegalArgumentException("O nome do arquivo é inválido ou não possui uma extensão válida.");
         }
         return fileName.substring(fileName.lastIndexOf('.') + 1);
+    }
+
+    private boolean isValidVideoContent(MultipartFile file) {
+        try {
+            return file.getSize() > 0;
+        } catch (Exception e) {
+            logger.error("Erro ao validar conteúdo do vídeo: {}", e.getMessage(), e);
+            throw new IllegalArgumentException("Erro ao validar o conteúdo do vídeo.");
+        }
     }
 
     public List<VideoFileDTO> getAllVideos() {
