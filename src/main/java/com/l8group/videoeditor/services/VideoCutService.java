@@ -18,6 +18,7 @@ import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.utils.VideoDuration;
 
 import jakarta.transaction.Transactional;
+import jakarta.validation.Valid;
 
 @Service
 public class VideoCutService {
@@ -32,7 +33,7 @@ public class VideoCutService {
     }
 
     @Transactional
-    public VideoCut cutVideo(VideoCutDTO videoCutDTO) throws Exception {
+    public VideoCut cutVideo(@Valid VideoCutDTO videoCutDTO) throws Exception {
         Optional<VideoFile> optionalVideoFile = videoFileRepository.findById(UUID.fromString(videoCutDTO.getVideoId()));
         if (optionalVideoFile.isEmpty()) {
             throw new IllegalArgumentException("O vídeo com o ID fornecido não foi encontrado.");
@@ -87,12 +88,32 @@ public class VideoCutService {
     }
 
     private void validateCutTimes(Long startTimeInSeconds, Long endTimeInSeconds, Long originalDuration) {
+        final long minimumCutDuration = 1L;
+
+        if (startTimeInSeconds.equals(endTimeInSeconds)) {
+            throw new IllegalArgumentException(
+                    String.format("O corte não é possível. O tempo de início (%s) e término (%s) são iguais. "
+                            + "Defina um intervalo válido de pelo menos %d segundo(s).",
+                            formatDuration(startTimeInSeconds), formatDuration(endTimeInSeconds), minimumCutDuration));
+        }
+
+        if ((endTimeInSeconds - startTimeInSeconds) < minimumCutDuration) {
+            throw new IllegalArgumentException(
+                    String.format("O corte é muito curto. A duração mínima permitida é de %d segundo(s). "
+                            + "Por favor, ajuste os tempos de início (%s) e término (%s).",
+                            minimumCutDuration, formatDuration(startTimeInSeconds), formatDuration(endTimeInSeconds)));
+        }
+
         if (startTimeInSeconds >= endTimeInSeconds) {
             throw new IllegalArgumentException("O tempo de início deve ser menor que o tempo de término.");
         }
+
         if (endTimeInSeconds > originalDuration) {
-            throw new IllegalArgumentException("O tempo de término não pode ser maior que a duração do vídeo.");
+            throw new IllegalArgumentException(
+                    String.format("O tempo de término (%s) não pode ser maior que a duração do vídeo (%s).",
+                            formatDuration(endTimeInSeconds), formatDuration(originalDuration)));
         }
+
         if (startTimeInSeconds < 0 || endTimeInSeconds < 0) {
             throw new IllegalArgumentException("Os tempos de início e término não podem ser negativos.");
         }

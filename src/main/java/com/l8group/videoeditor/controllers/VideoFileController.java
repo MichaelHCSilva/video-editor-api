@@ -109,13 +109,17 @@ public class VideoFileController {
             return ResponseEntity.ok(videoCut);
         } catch (IllegalArgumentException e) {
             logger.error("Erro de validação: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", e.getMessage()));
         } catch (IOException e) {
             logger.error("Erro ao cortar o vídeo: {}", e.getMessage());
-            return ResponseEntity.status(500).body("Erro ao cortar o vídeo. Detalhes: " + e.getMessage());
+            return ResponseEntity.status(500).body(Map.of(
+                    "message", "Erro ao cortar o vídeo. Detalhes: " + e.getMessage()));
         } catch (Exception e) {
             logger.error("Erro inesperado: {}", e.getMessage());
-            return ResponseEntity.status(500).body("Ocorreu um erro inesperado ao processar o vídeo.");
+            return ResponseEntity.status(500).body(Map.of(
+                    "message", "Ocorreu um erro inesperado ao processar o vídeo."));
         }
     }
+
 }
