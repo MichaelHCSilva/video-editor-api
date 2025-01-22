@@ -48,4 +48,12 @@ public class VideoDuration {
 
         throw new IOException("Não foi possível obter a duração do vídeo.");
     }
+
+    // Método para formatar a duração do vídeo em HH:mm:ss
+    public static String formatDuration(long seconds) {
+        long hours = seconds / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long sec = seconds % 60;
+        return String.format("%02d:%02d:%02d", hours, minutes, sec);
+    }
 }

@@ -1,5 +1,12 @@
 package com.l8group.videoeditor.services;
 
+import java.io.File;
+import java.io.IOException;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -10,13 +17,6 @@ import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.utils.VideoDuration;
-
-import java.io.File;
-import java.io.IOException;
-import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
 
 @Service
 public class VideoFileService {
@@ -37,19 +37,24 @@ public class VideoFileService {
 
             if (!isSupportedFormat(fileFormat)) {
                 rejectedFiles.add(file.getOriginalFilename() + " (Formato inválido)");
-                
             } else if (file.isEmpty()) {
                 rejectedFiles.add(file.getOriginalFilename() + " (Arquivo vazio)");
-              
             } else if (!isValidVideoContent(file)) {
                 rejectedFiles.add(file.getOriginalFilename() + " (Arquivo corrompido ou ilegível)");
-           
             } else {
                 try {
-                  
-                    String filePath = saveFile(file);  
+                    // Salva o arquivo no sistema de arquivos
+                    String filePath = saveFile(file);
 
-                    
+                    // Verifica se o arquivo foi salvo corretamente
+                    File savedFile = new File(filePath);
+                    if (!savedFile.exists()) {
+                        logger.error("Arquivo não encontrado no caminho: {}", filePath);
+                        rejectedFiles.add(file.getOriginalFilename() + " (Arquivo não encontrado)");
+                        continue;
+                    }
+
+                    // Cria o objeto VideoFile
                     VideoFile videoFile = new VideoFile();
                     videoFile.setFileName(file.getOriginalFilename());
                     videoFile.setFileSize(file.getSize());
@@ -57,13 +62,21 @@ public class VideoFileService {
                     videoFile.setUploadedAt(ZonedDateTime.now());
                     videoFile.setStatus(VideoStatus.PROCESSING);
 
-                    
+                    // Define o caminho do arquivo
+                    videoFile.setFilePath(filePath);
+
+                    // Calcula a duração do vídeo
+                    logger.debug("Calculando a duração do vídeo para o arquivo: {}", filePath);
                     Long videoDuration = VideoDuration.getVideoDurationInSeconds(filePath);
                     videoFile.setDuration(videoDuration);
+                    logger.debug("Duração do vídeo: {}", videoDuration);
 
-                    
+                    // Salva os metadados no banco de dados
                     videoFileRepository.save(videoFile);
+
+                    // Adiciona o ID à lista de processados
                     processedFiles.add(videoFile.getId());
+
                     logger.info("Metadados do vídeo salvos com sucesso para o arquivo: {}", file.getOriginalFilename());
                 } catch (IOException | InterruptedException e) {
                     logger.error("Erro ao processar o arquivo {}: {}", file.getOriginalFilename(), e.getMessage());
@@ -75,21 +88,21 @@ public class VideoFileService {
         return processedFiles;
     }
 
-    
     private String saveFile(MultipartFile file) throws IOException {
-      
-        String uploadDir = "/mnt/c/Users/micha/OneDrive/Documentos/video-editor-api/videos/"; 
+        String uploadDir = "/mnt/c/Users/micha/OneDrive/Documentos/video-editor-api/videos/";
         String filePath = uploadDir + file.getOriginalFilename();
-    
+
         File directory = new File(uploadDir);
         if (!directory.exists()) {
             directory.mkdirs();
+            logger.debug("Diretório criado: {}", uploadDir);
         }
-    
+
         File destinationFile = new File(filePath);
         file.transferTo(destinationFile);
-        
-        return filePath;  
+
+        logger.debug("Arquivo salvo no caminho: {}", filePath);
+        return filePath;
     }
 
     private boolean isSupportedFormat(String fileFormat) {

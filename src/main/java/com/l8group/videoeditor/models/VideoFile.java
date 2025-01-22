@@ -14,8 +14,9 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+
 @Entity
-@Table(name = "video_files")
+@Table(name = "videos_files")
 public class VideoFile {
 
     @Id
@@ -40,6 +41,9 @@ public class VideoFile {
 
     @Column(name = "duration", nullable = false)
     private Long duration;
+
+    @Column(name = "file_path")  
+    private String filePath;
 
     public UUID getId() {
         return id;
@@ -95,6 +99,14 @@ public class VideoFile {
 
     public void setDuration(Long duration) {
         this.duration = duration;
+    }
+
+    public String getFilePath() {
+        return filePath;
+    }
+
+    public void setFilePath(String filePath) {
+        this.filePath = filePath;
     }
 
 
