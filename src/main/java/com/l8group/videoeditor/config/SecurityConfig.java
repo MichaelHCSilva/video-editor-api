@@ -17,6 +17,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/videos").permitAll()
                 .requestMatchers("/api/videos/upload").permitAll()
                 .requestMatchers("/api/videos/edit/cut").permitAll()
+                .requestMatchers("/api/videos/edit/resize").permitAll()
                 .requestMatchers("/error").permitAll() 
                 .anyRequest().authenticated()  // Exige autenticação para todas as outras requisições
             );

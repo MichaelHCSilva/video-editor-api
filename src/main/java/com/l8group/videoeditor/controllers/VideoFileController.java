@@ -21,9 +21,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.l8group.videoeditor.dtos.VideoCutDTO;
 import com.l8group.videoeditor.dtos.VideoFileDTO;
+import com.l8group.videoeditor.dtos.VideoResizeDTO;
 import com.l8group.videoeditor.models.VideoCut;
+import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
+import com.l8group.videoeditor.services.VideoResizeService;
 
 import jakarta.validation.Valid;
 
@@ -35,10 +38,13 @@ public class VideoFileController {
 
     private final VideoFileService videoFileService;
     private final VideoCutService videoCutService;
+    private final VideoResizeService videoResizeService;
 
-    public VideoFileController(VideoFileService videoFileService, VideoCutService videoCutService) {
+    public VideoFileController(VideoFileService videoFileService, VideoCutService videoCutService,
+            VideoResizeService videoResizeService) {
         this.videoFileService = videoFileService;
         this.videoCutService = videoCutService;
+        this.videoResizeService = videoResizeService;
     }
 
     @PostMapping("/upload")
@@ -121,5 +127,17 @@ public class VideoFileController {
                     "message", "Ocorreu um erro inesperado ao processar o vídeo."));
         }
     }
+
+    @PostMapping("/edit/resize")
+public ResponseEntity<?> resizeVideo(@RequestBody @Valid VideoResizeDTO videoResizeDTO) {
+    try {
+        VideoResize resizedVideo = videoResizeService.resizeVideo(videoResizeDTO);
+        return ResponseEntity.ok(resizedVideo);
+    } catch (IllegalArgumentException e) {
+        return ResponseEntity.badRequest().body("{\"message\": \"" + e.getMessage() + "\"}");
+    } catch (Exception e) {
+        return ResponseEntity.status(500).body("{\"message\": \"Erro interno do servidor: " + e.getMessage() + "\"}");
+    }
+}
 
 }

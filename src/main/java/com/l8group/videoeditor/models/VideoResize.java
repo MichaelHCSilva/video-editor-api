@@ -3,18 +3,28 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
+import com.l8group.videoeditor.enums.SupportedVideoResolution;
 import com.l8group.videoeditor.enums.VideoStatus;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "videos_cut") 
-public class VideoCut {
+@Table(name = "videos_resize")
+public class VideoResize {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
-    
+
     @ManyToOne
     @JoinColumn(name = "video_file_id", nullable = false)
     private VideoFile videoFile;
@@ -22,15 +32,16 @@ public class VideoCut {
     @Column(name = "file_name", nullable = false)
     private String fileName;
 
-    @Column(name = "duration", nullable = false)
-    private Long duration;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
+    private VideoStatus status;
 
     @Column(name = "uploaded_at", nullable = false)
     private ZonedDateTime uploadedAt;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private VideoStatus status;
+    @Column(name = "resolution", nullable = false)
+    private SupportedVideoResolution resolution;
 
     public UUID getId() {
         return id;
@@ -56,12 +67,12 @@ public class VideoCut {
         this.fileName = fileName;
     }
 
-    public Long getDuration() {
-        return duration;
+    public VideoStatus getStatus() {
+        return status;
     }
 
-    public void setDuration(Long duration) {
-        this.duration = duration;
+    public void setStatus(VideoStatus status) {
+        this.status = status;
     }
 
     public ZonedDateTime getUploadedAt() {
@@ -72,13 +83,12 @@ public class VideoCut {
         this.uploadedAt = uploadedAt;
     }
 
-    public VideoStatus getStatus() {
-        return status;
+    public SupportedVideoResolution getResolution() {
+        return resolution;
     }
 
-    public void setStatus(VideoStatus status) {
-        this.status = status;
+    public void setResolution(SupportedVideoResolution resolution) {
+        this.resolution = resolution;
     }
-    
 
 }

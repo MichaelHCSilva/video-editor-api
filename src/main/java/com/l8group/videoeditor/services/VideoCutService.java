@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import com.l8group.videoeditor.dtos.VideoCutDTO;
+import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoCutRepository;
@@ -25,7 +26,7 @@ public class VideoCutService {
 
     private final VideoFileRepository videoFileRepository;
     private final VideoCutRepository videoCutRepository;
-    private final String outputSubdirectory = "output";
+    private final String outputSubdirectory = "videos-cuts";
 
     public VideoCutService(VideoFileRepository videoFileRepository, VideoCutRepository videoCutRepository) {
         this.videoFileRepository = videoFileRepository;
@@ -73,6 +74,7 @@ public class VideoCutService {
         videoCut.setFileName(cutFileName);
         videoCut.setDuration(cutDuration);
         videoCut.setUploadedAt(ZonedDateTime.now());
+        videoCut.setStatus(VideoStatus.PROCESSING);
 
         return videoCutRepository.save(videoCut);
     }
