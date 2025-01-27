@@ -10,7 +10,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
-import com.l8group.videoeditor.dtos.VideoCutDTO;
+import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoFile;
@@ -34,7 +34,7 @@ public class VideoCutService {
     }
 
     @Transactional
-    public VideoCut cutVideo(@Valid VideoCutDTO videoCutDTO) throws Exception {
+    public VideoCut cutVideo(@Valid VideoCutResponseDTO videoCutDTO) throws Exception {
         Optional<VideoFile> optionalVideoFile = videoFileRepository.findById(UUID.fromString(videoCutDTO.getVideoId()));
         if (optionalVideoFile.isEmpty()) {
             throw new IllegalArgumentException("O vídeo com o ID fornecido não foi encontrado.");

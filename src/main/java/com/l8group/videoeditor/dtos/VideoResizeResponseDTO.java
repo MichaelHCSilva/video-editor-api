@@ -1,11 +1,11 @@
 package com.l8group.videoeditor.dtos;
 
-import com.l8group.videoeditor.enums.SupportedVideoResolution;
+import com.l8group.videoeditor.enums.VideoResolution;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
 
-public class VideoResizeDTO {
+public class VideoResizeResponseDTO {
 
     @NotBlank(message = "O ID do vídeo é obrigatório.")
     private String videoId;
@@ -40,7 +40,7 @@ public class VideoResizeDTO {
         this.height = height;
     }
 
-    public SupportedVideoResolution getResolution() {
-        return SupportedVideoResolution.fromDimensions(width, height);
+    public VideoResolution getResolution() {
+        return VideoResolution.fromDimensions(width, height);
     }
 }

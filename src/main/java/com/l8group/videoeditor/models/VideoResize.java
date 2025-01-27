@@ -3,19 +3,10 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
-import com.l8group.videoeditor.enums.SupportedVideoResolution;
+import com.l8group.videoeditor.enums.VideoResolution;
 import com.l8group.videoeditor.enums.VideoStatus;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "videos_resize")
@@ -41,7 +32,7 @@ public class VideoResize {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "resolution", nullable = false)
-    private SupportedVideoResolution resolution;
+    private VideoResolution resolution;
 
     public UUID getId() {
         return id;
@@ -83,11 +74,11 @@ public class VideoResize {
         this.uploadedAt = uploadedAt;
     }
 
-    public SupportedVideoResolution getResolution() {
+    public VideoResolution getResolution() {
         return resolution;
     }
 
-    public void setResolution(SupportedVideoResolution resolution) {
+    public void setResolution(VideoResolution resolution) {
         this.resolution = resolution;
     }
 

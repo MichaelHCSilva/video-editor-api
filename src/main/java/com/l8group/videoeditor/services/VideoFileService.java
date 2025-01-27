@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.l8group.videoeditor.dtos.VideoFileDTO;
+import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
@@ -128,7 +128,7 @@ public class VideoFileService {
         }
     }
 
-    public List<VideoFileDTO> getAllVideos() {
+    public List<VideoFileResponseDTO> getAllVideos() {
         return videoFileRepository.findAllVideos();
     }
 }

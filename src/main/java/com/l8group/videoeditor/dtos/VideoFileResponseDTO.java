@@ -4,14 +4,14 @@ import java.time.ZonedDateTime;
 
 import com.l8group.videoeditor.enums.VideoStatus;
 
-public class VideoFileDTO {
+public class VideoFileResponseDTO {
 
     private String fileName;
     private ZonedDateTime uploadedAt;
     private VideoStatus status;
     private Long duration;
 
-    public VideoFileDTO(String fileName, ZonedDateTime uploadedAt, VideoStatus status, Long duration) {
+    public VideoFileResponseDTO(String fileName, ZonedDateTime uploadedAt, VideoStatus status, Long duration) {
         this.fileName = fileName;
         this.uploadedAt = uploadedAt;
         this.status = status;

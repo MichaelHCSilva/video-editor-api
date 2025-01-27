@@ -3,7 +3,7 @@ package com.l8group.videoeditor.dtos;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
-public class VideoCutDTO {
+public class VideoCutResponseDTO {
     @NotBlank(message = "O ID do vídeo é obrigatório.")
     private String videoId;
 

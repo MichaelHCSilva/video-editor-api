@@ -19,15 +19,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.l8group.videoeditor.dtos.VideoCutDTO;
-import com.l8group.videoeditor.dtos.VideoFileDTO;
-import com.l8group.videoeditor.dtos.VideoResizeDTO;
+import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
+import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
+import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
+import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
 import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoResize;
+import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
+import com.l8group.videoeditor.services.VideoOverlayService;
 import com.l8group.videoeditor.services.VideoResizeService;
 
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 
 @RestController
@@ -39,12 +43,14 @@ public class VideoFileController {
     private final VideoFileService videoFileService;
     private final VideoCutService videoCutService;
     private final VideoResizeService videoResizeService;
+    private final VideoOverlayService videoOverlayService;
 
     public VideoFileController(VideoFileService videoFileService, VideoCutService videoCutService,
-            VideoResizeService videoResizeService) {
+            VideoResizeService videoResizeService, VideoOverlayService videoOverlayService) {
         this.videoFileService = videoFileService;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
+        this.videoOverlayService = videoOverlayService;
     }
 
     @PostMapping("/upload")
@@ -96,7 +102,7 @@ public class VideoFileController {
 
     @GetMapping
     public ResponseEntity<?> getVideos() {
-        List<VideoFileDTO> videos = videoFileService.getAllVideos();
+        List<VideoFileResponseDTO> videos = videoFileService.getAllVideos();
 
         if (videos.isEmpty()) {
             Map<String, String> response = new HashMap<>();
@@ -109,7 +115,7 @@ public class VideoFileController {
     }
 
     @PostMapping("/edit/cut")
-    public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutDTO videoCutDTO) {
+    public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutResponseDTO videoCutDTO) {
         try {
             VideoCut videoCut = videoCutService.cutVideo(videoCutDTO);
             return ResponseEntity.ok(videoCut);
@@ -129,15 +135,33 @@ public class VideoFileController {
     }
 
     @PostMapping("/edit/resize")
-public ResponseEntity<?> resizeVideo(@RequestBody @Valid VideoResizeDTO videoResizeDTO) {
-    try {
-        VideoResize resizedVideo = videoResizeService.resizeVideo(videoResizeDTO);
-        return ResponseEntity.ok(resizedVideo);
-    } catch (IllegalArgumentException e) {
-        return ResponseEntity.badRequest().body("{\"message\": \"" + e.getMessage() + "\"}");
-    } catch (Exception e) {
-        return ResponseEntity.status(500).body("{\"message\": \"Erro interno do servidor: " + e.getMessage() + "\"}");
+    public ResponseEntity<?> resizeVideo(@RequestBody @Valid VideoResizeResponseDTO videoResizeDTO) {
+        try {
+            VideoResize resizedVideo = videoResizeService.resizeVideo(videoResizeDTO);
+            return ResponseEntity.ok(resizedVideo);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body("{\"message\": \"" + e.getMessage() + "\"}");
+        } catch (Exception e) {
+            return ResponseEntity.status(500)
+                    .body("{\"message\": \"Erro interno do servidor: " + e.getMessage() + "\"}");
+        }
     }
-}
 
+    @PostMapping("/edit/overlay-text")
+    public ResponseEntity<?> overlayTextOnVideo(@RequestBody @Valid VideoOverlayRequest overlayRequest) {
+        try {
+            VideoOverlayResponseDTO responseDTO = videoOverlayService.createOverlay(overlayRequest);
+            return ResponseEntity.ok(responseDTO);
+        } catch (EntityNotFoundException e) {
+            logger.error("Erro: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
+        } catch (IllegalArgumentException e) {
+            logger.error("Erro de validação: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Erro inesperado: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Ocorreu um erro inesperado ao aplicar a sobreposição de texto."));
+        }
+    }
 }

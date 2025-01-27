@@ -12,13 +12,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import com.l8group.videoeditor.dtos.VideoResizeDTO;
-import com.l8group.videoeditor.enums.SupportedVideoResolution;
+import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
+import com.l8group.videoeditor.enums.VideoResolution;
 import com.l8group.videoeditor.enums.VideoStatus;
-import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.models.VideoFile;
-import com.l8group.videoeditor.repositories.VideoResizeRepository;
+import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
+import com.l8group.videoeditor.repositories.VideoResizeRepository;
 
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
@@ -38,7 +38,7 @@ public class VideoResizeService {
     }
 
     @Transactional
-    public VideoResize resizeVideo(@Valid VideoResizeDTO videoResizeDTO) throws Exception {
+    public VideoResize resizeVideo(@Valid VideoResizeResponseDTO videoResizeDTO) throws Exception {
         logger.info("Iniciando o processo de redimensionamento de vídeo: {}", videoResizeDTO);
 
         if (videoResizeDTO.getVideoId() == null || videoResizeDTO.getVideoId().isBlank()) {
@@ -70,6 +70,16 @@ public class VideoResizeService {
                             + ". Resoluções suportadas: " + supportedResolutions);
         }
 
+        // Verificar se já existe um vídeo redimensionado com as mesmas dimensões
+        Optional<VideoResize> existingResize = videoResizeRepository.findByVideoFileAndResolution(
+                originalVideo,
+                VideoResolution.fromDimensions(videoResizeDTO.getWidth(), videoResizeDTO.getHeight()));
+        if (existingResize.isPresent()) {
+            logger.warn("Vídeo com essa resolução já existe: {}x{}", videoResizeDTO.getWidth(),
+                    videoResizeDTO.getHeight());
+            throw new IllegalArgumentException("Vídeo com essa resolução já existe.");
+        }
+
         String originalFilePath = convertToWSLPath(originalVideo.getFilePath());
         if (originalFilePath == null || originalFilePath.isBlank()) {
             logger.error("Caminho do vídeo original inválido.");
@@ -94,8 +104,7 @@ public class VideoResizeService {
         videoResize.setVideoFile(originalVideo);
         videoResize.setFileName(resizedFileName);
         videoResize.setStatus(VideoStatus.PROCESSING);
-        videoResize.setResolution(
-                SupportedVideoResolution.fromDimensions(videoResizeDTO.getWidth(), videoResizeDTO.getHeight()));
+        videoResize.setResolution(VideoResolution.fromDimensions(videoResizeDTO.getWidth(), videoResizeDTO.getHeight()));
         videoResize.setUploadedAt(java.time.ZonedDateTime.now());
 
         logger.info("Salvando metadados do vídeo redimensionado no banco de dados.");
@@ -177,7 +186,7 @@ public class VideoResizeService {
 
     private boolean isResolutionSupported(int width, int height) {
         try {
-            SupportedVideoResolution.fromDimensions(width, height);
+            VideoResolution.fromDimensions(width, height);
             return true;
         } catch (IllegalArgumentException e) {
             return false;
@@ -185,7 +194,7 @@ public class VideoResizeService {
     }
 
     private String getSupportedResolutions() {
-        return java.util.Arrays.stream(SupportedVideoResolution.values())
+        return java.util.Arrays.stream(VideoResolution.values())
                 .map(res -> res.getWidth() + "x" + res.getHeight())
                 .collect(Collectors.joining(", "));
     }

@@ -1,6 +1,6 @@
 package com.l8group.videoeditor.enums;
 
-public enum SupportedVideoResolution {
+public enum VideoResolution {
     RES_1280x720(1280, 720),
     RES_1920x1080(1920, 1080),
     RES_720x1280(720, 1280),
@@ -12,7 +12,7 @@ public enum SupportedVideoResolution {
     private final int width;
     private final int height;
 
-    SupportedVideoResolution(int width, int height) {
+    VideoResolution(int width, int height) {
         this.width = width;
         this.height = height;
     }
@@ -25,8 +25,12 @@ public enum SupportedVideoResolution {
         return height;
     }
 
-    public static SupportedVideoResolution fromDimensions(int width, int height) {
-        for (SupportedVideoResolution res : values()) {
+    public String getResolutionAsString() {
+        return width + "x" + height;
+    }
+
+    public static VideoResolution fromDimensions(int width, int height) {
+        for (VideoResolution res : values()) {
             if (res.width == width && res.height == height) {
                 return res;
             }
