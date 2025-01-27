@@ -1,42 +1,40 @@
 package com.l8group.videoeditor.dtos;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
+import java.time.ZonedDateTime;
 
 public class VideoCutResponseDTO {
-    @NotBlank(message = "O ID do vídeo é obrigatório.")
-    private String videoId;
 
-    @NotBlank(message = "O horário de início é obrigatório.")
-    @Pattern(regexp = "\\d{2}:\\d{2}:\\d{2}", message = "O horário de início deve estar no formato HH:mm:ss.")
-    private String startTime;
+    private String cutFileName;
+    private String duration;
+    private ZonedDateTime uploadedAt;
 
-    @NotBlank(message = "O horário de término é obrigatório.")
-    @Pattern(regexp = "\\d{2}:\\d{2}:\\d{2}", message = "O horário de término deve estar no formato HH:mm:ss.")
-    private String endTime;
-
-    public String getVideoId() {
-        return videoId;
+    public VideoCutResponseDTO(String cutFileName, String duration, ZonedDateTime uploadedAt) {
+        this.cutFileName = cutFileName;
+        this.duration = duration;
+        this.uploadedAt = uploadedAt;
     }
 
-    public void setVideoId(String videoId) {
-        this.videoId = videoId;
+    public String getCutFileName() {
+        return cutFileName;
     }
 
-    public String getStartTime() {
-        return startTime;
+    public void setCutFileName(String cutFileName) {
+        this.cutFileName = cutFileName;
     }
 
-    public void setStartTime(String startTime) {
-        this.startTime = startTime;
+    public String getDuration() {
+        return duration;
     }
 
-    public String getEndTime() {
-        return endTime;
+    public void setDuration(String duration) {
+        this.duration = duration;
     }
 
-    public void setEndTime(String endTime) {
-        this.endTime = endTime;
+    public ZonedDateTime getUploadedAt() {
+        return uploadedAt;
     }
 
+    public void setUploadedAt(ZonedDateTime uploadedAt) {
+        this.uploadedAt = uploadedAt;
+    }
 }

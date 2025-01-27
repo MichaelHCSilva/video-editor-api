@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.time.ZonedDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +13,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
+import com.l8group.videoeditor.enums.OverlayPosition;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoOverlay;
@@ -41,7 +41,8 @@ public class VideoOverlayService {
     public VideoOverlayResponseDTO createOverlay(VideoOverlayRequest overlayRequest) {
         logger.info("Iniciando a aplicação de marca d'água no vídeo com ID: {}", overlayRequest.getVideoId());
 
-        Optional<VideoFile> videoFileOptional = videoFileRepository.findById(UUID.fromString(overlayRequest.getVideoId()));
+        Optional<VideoFile> videoFileOptional = videoFileRepository
+                .findById(UUID.fromString(overlayRequest.getVideoId()));
         if (videoFileOptional.isEmpty()) {
             logger.error("O vídeo com o ID {} não foi encontrado.", overlayRequest.getVideoId());
             throw new EntityNotFoundException("O vídeo com o ID fornecido não foi encontrado.");
@@ -103,32 +104,41 @@ public class VideoOverlayService {
         int videoWidth = dimensions[0];
         int videoHeight = dimensions[1];
 
-       
-        validateOverlayPosition(overlayRequest.getPosition().getPosition());
+        validateOverlayPosition(overlayRequest.getPosition());
         String calculatedPosition = calculateOverlayPosition(
-                overlayRequest.getPosition().getPosition(), videoWidth, videoHeight, overlayRequest.getFontSize());
+                overlayRequest.getPosition(), videoWidth, videoHeight, overlayRequest.getFontSize());
 
-        
-        String fontPath = "/caminho/para/sua/fonte.ttf"; 
+        // Defina o caminho da fonte de forma dinâmica
+        String fontPath = "/caminho/para/sua/fonte.ttf"; // Esse valor pode ser extraído de configuração ou variáveis de
+                                                         // ambiente.
 
         String brightnessFilter = String.format(
-            "drawtext=text='%s':" +
-            "fontfile=%s:" +
-            "fontcolor=white:" +
-            "fontsize=%d:" +
-            "%s",
-            overlayRequest.getOverlayData(), fontPath, overlayRequest.getFontSize(), calculatedPosition);
+                "drawtext=text='%s':" +
+                        "fontfile=%s:" +
+                        "fontcolor=white:" +
+                        "fontsize=%d:" +
+                        "%s",
+                overlayRequest.getOverlayData(), fontPath, overlayRequest.getFontSize(), calculatedPosition);
 
         String[] overlayCommand = {
-            "ffmpeg", "-i", originalFilePath,
-            "-vf", brightnessFilter,
-            "-codec:v", "libx264", "-preset", "fast", "-crf", "18",
-            "-codec:a", "aac", "-b:a", "192k", "-strict", "-2", overlayFilePath
+                "ffmpeg", "-i", originalFilePath,
+                "-vf", brightnessFilter,
+                "-codec:v", "libx264", "-preset", "fast", "-crf", "18",
+                "-codec:a", "aac", "-b:a", "192k", "-strict", "-2", overlayFilePath
         };
 
         ProcessBuilder overlayProcessBuilder = new ProcessBuilder(overlayCommand);
         overlayProcessBuilder.redirectErrorStream(true);
         Process overlayProcess = overlayProcessBuilder.start();
+
+        // Captura a saída do processo FFmpeg para logar mensagens
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(overlayProcess.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                logger.info(line); // Loga a saída do FFmpeg para diagnóstico.
+            }
+        }
+
         overlayProcess.waitFor();
 
         if (overlayProcess.exitValue() != 0) {
@@ -139,8 +149,8 @@ public class VideoOverlayService {
 
     private int[] getVideoDimensions(String videoFilePath) throws IOException, InterruptedException {
         String[] dimensionCommand = {
-            "ffprobe", "-v", "error", "-select_streams", "v:0",
-            "-show_entries", "stream=width,height", "-of", "csv=p=0", videoFilePath
+                "ffprobe", "-v", "error", "-select_streams", "v:0",
+                "-show_entries", "stream=width,height", "-of", "csv=p=0", videoFilePath
         };
 
         ProcessBuilder processBuilder = new ProcessBuilder(dimensionCommand);
@@ -155,30 +165,32 @@ public class VideoOverlayService {
                 String[] dimensions = output.split(",");
                 int width = Integer.parseInt(dimensions[0]);
                 int height = Integer.parseInt(dimensions[1]);
-                return new int[]{width, height};
+                return new int[] { width, height };
             }
         }
 
         throw new RuntimeException("Não foi possível obter as dimensões do vídeo.");
     }
 
-    private String calculateOverlayPosition(String position, int videoWidth, int videoHeight, int fontSize) {
-        return switch (position.toLowerCase()) {
-            case "center" -> {
-                int xCenter = (videoWidth - (fontSize * 10)) / 2; 
+    private String calculateOverlayPosition(OverlayPosition position, int videoWidth, int videoHeight, int fontSize) {
+        return switch (position) {
+            case CENTER -> {
+                int xCenter = (videoWidth - (fontSize * 10)) / 2;
                 int yCenter = (videoHeight - fontSize) / 2;
                 yield String.format("x=%d:y=%d", xCenter, yCenter);
             }
-            case "top" -> "x=10:y=10";
-            case "bottom" -> String.format("x=10:y=%d", videoHeight - fontSize - 10);
+            case TOP_LEFT -> "x=10:y=10";
+            case TOP_RIGHT -> String.format("x=%d:y=10", videoWidth - (fontSize * 10) - 10);
+            case BOTTOM_LEFT -> String.format("x=10:y=%d", videoHeight - fontSize - 10);
+            case BOTTOM_RIGHT ->
+                String.format("x=%d:y=%d", videoWidth - (fontSize * 10) - 10, videoHeight - fontSize - 10);
             default -> throw new IllegalArgumentException("A posição fornecida não é válida: " + position);
         };
     }
 
-    private void validateOverlayPosition(String position) {
-        List<String> validPositions = List.of("center", "top", "bottom");
-        if (!validPositions.contains(position.toLowerCase())) {
-            throw new IllegalArgumentException("A posição fornecida deve ser 'center', 'top' ou 'bottom'.");
+    private void validateOverlayPosition(OverlayPosition position) {
+        if (position == null) {
+            throw new IllegalArgumentException("A posição fornecida não é válida.");
         }
     }
 

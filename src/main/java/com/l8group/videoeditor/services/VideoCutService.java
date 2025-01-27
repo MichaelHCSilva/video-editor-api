@@ -16,6 +16,7 @@ import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoCutRepository;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
+import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.utils.VideoDuration;
 
 import jakarta.transaction.Transactional;
@@ -34,8 +35,9 @@ public class VideoCutService {
     }
 
     @Transactional
-    public VideoCut cutVideo(@Valid VideoCutResponseDTO videoCutDTO) throws Exception {
-        Optional<VideoFile> optionalVideoFile = videoFileRepository.findById(UUID.fromString(videoCutDTO.getVideoId()));
+    public VideoCutResponseDTO cutVideo(@Valid VideoCutRequest videoCutRequest) throws Exception {
+        Optional<VideoFile> optionalVideoFile = videoFileRepository
+                .findById(UUID.fromString(videoCutRequest.getVideoId()));
         if (optionalVideoFile.isEmpty()) {
             throw new IllegalArgumentException("O vídeo com o ID fornecido não foi encontrado.");
         }
@@ -46,24 +48,18 @@ public class VideoCutService {
             throw new IllegalArgumentException("Caminho do vídeo original é inválido.");
         }
 
-        Long originalDuration;
-        try {
-            originalDuration = VideoDuration.getVideoDurationInSeconds(originalFilePath);
-        } catch (IOException | InterruptedException e) {
-            throw new RuntimeException("Erro ao obter a duração do vídeo. Verifique o arquivo ou o FFmpeg.");
-        }
+        Long originalDuration = getOriginalVideoDuration(originalFilePath);
 
-        Long startTimeInSeconds = parseTimeToSeconds(videoCutDTO.getStartTime());
-        Long endTimeInSeconds = parseTimeToSeconds(videoCutDTO.getEndTime());
+        Long startTimeInSeconds = parseTimeToSeconds(videoCutRequest.getStartTime());
+        Long endTimeInSeconds = parseTimeToSeconds(videoCutRequest.getEndTime());
         validateCutTimes(startTimeInSeconds, endTimeInSeconds, originalDuration);
 
         String outputDirectoryPath = getOutputDirectoryPath(originalFilePath);
         createDirectoryIfNotExists(outputDirectoryPath);
-
         String cutFileName = generateCutFileName(originalVideo);
         String cutFilePath = outputDirectoryPath + File.separator + cutFileName;
 
-        executeCutCommand(originalFilePath, videoCutDTO.getStartTime(), videoCutDTO.getEndTime(), cutFilePath);
+        executeCutCommand(originalFilePath, videoCutRequest.getStartTime(), videoCutRequest.getEndTime(), cutFilePath);
 
         verifyCutFileExistence(cutFilePath);
 
@@ -76,17 +72,32 @@ public class VideoCutService {
         videoCut.setUploadedAt(ZonedDateTime.now());
         videoCut.setStatus(VideoStatus.PROCESSING);
 
-        return videoCutRepository.save(videoCut);
+        videoCut = videoCutRepository.save(videoCut);
+
+        // Retornando o DTO de resposta
+        return new VideoCutResponseDTO(
+                videoCut.getFileName(),
+                formatDuration(cutDuration),
+                videoCut.getUploadedAt());
+    }
+
+    private Long getOriginalVideoDuration(String originalFilePath) throws IOException {
+        try {
+            return VideoDuration.getVideoDurationInSeconds(originalFilePath);
+        } catch (IOException | InterruptedException e) {
+            throw new RuntimeException("Erro ao obter a duração do vídeo. Verifique o arquivo ou o FFmpeg.");
+        }
     }
 
     private String convertToWSLPath(String filePath) {
-        String convertedPath = filePath;
-        if (filePath != null && filePath.startsWith("C:\\")) {
-            convertedPath = "/mnt/c/" + filePath.substring(3).replace("\\", "/");
+        if (filePath == null || filePath.isBlank()) {
+            return null;
         }
-        System.out.println("Caminho original: " + filePath);
-        System.out.println("Caminho convertido: " + convertedPath);
-        return convertedPath;
+        if (filePath.matches("^[A-Z]:\\\\.*")) {
+            String driveLetter = filePath.substring(0, 1).toLowerCase();
+            return "/mnt/" + driveLetter + "/" + filePath.substring(3).replace("\\", "/");
+        }
+        return filePath;
     }
 
     private void validateCutTimes(Long startTimeInSeconds, Long endTimeInSeconds, Long originalDuration) {
@@ -122,8 +133,11 @@ public class VideoCutService {
     }
 
     private String generateCutFileName(VideoFile originalVideo) {
+        String originalFileName = originalVideo.getFileName();
+        String baseName = originalFileName.substring(0, originalFileName.lastIndexOf("."));
         String originalFileFormat = originalVideo.getFileFormat();
-        return originalVideo.getFileName().replace("." + originalFileFormat, "_cut." + originalFileFormat);
+
+        return baseName + "_cut." + originalFileFormat;
     }
 
     private void executeCutCommand(String originalFilePath, String startTime, String endTime, String cutFilePath)

@@ -23,8 +23,9 @@ import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
-import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoResize;
+import com.l8group.videoeditor.requests.VideoCutRequest;
+import com.l8group.videoeditor.requests.VideoFileRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
@@ -66,8 +67,13 @@ public class VideoFileController {
                             "Nenhum arquivo foi enviado. Por favor, selecione ao menos um arquivo de vídeo."));
         }
 
+        List<VideoFileRequest> videoFileRequests = new ArrayList<>();
+        for (MultipartFile file : files) {
+            videoFileRequests.add(new VideoFileRequest(file));
+        }
+
         List<String> rejectedFiles = new ArrayList<>();
-        List<UUID> processedFiles = videoFileService.uploadVideo(files, rejectedFiles);
+        List<UUID> processedFiles = videoFileService.uploadVideo(videoFileRequests, rejectedFiles);
 
         if (processedFiles.isEmpty() && rejectedFiles.isEmpty()) {
             return ResponseEntity.badRequest().body(
@@ -115,22 +121,16 @@ public class VideoFileController {
     }
 
     @PostMapping("/edit/cut")
-    public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutResponseDTO videoCutDTO) {
+    public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutRequest videoCutRequest) {
         try {
-            VideoCut videoCut = videoCutService.cutVideo(videoCutDTO);
-            return ResponseEntity.ok(videoCut);
+            VideoCutResponseDTO response = videoCutService.cutVideo(videoCutRequest);
+            return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
-            logger.error("Erro de validação: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of(
-                    "message", e.getMessage()));
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (IOException e) {
-            logger.error("Erro ao cortar o vídeo: {}", e.getMessage());
-            return ResponseEntity.status(500).body(Map.of(
-                    "message", "Erro ao cortar o vídeo. Detalhes: " + e.getMessage()));
+            return ResponseEntity.status(500).body(Map.of("message", "Erro ao cortar o vídeo. Detalhes: " + e.getMessage()));
         } catch (Exception e) {
-            logger.error("Erro inesperado: {}", e.getMessage());
-            return ResponseEntity.status(500).body(Map.of(
-                    "message", "Ocorreu um erro inesperado ao processar o vídeo."));
+            return ResponseEntity.status(500).body(Map.of("message", "Ocorreu um erro inesperado ao processar o vídeo."));
         }
     }
 

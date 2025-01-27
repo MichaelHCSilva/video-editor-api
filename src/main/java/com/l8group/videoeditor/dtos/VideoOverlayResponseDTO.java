@@ -42,6 +42,4 @@ public class VideoOverlayResponseDTO {
     public void setFontSize(Integer fontSize) {
         this.fontSize = fontSize;
     }
-
-    
 }

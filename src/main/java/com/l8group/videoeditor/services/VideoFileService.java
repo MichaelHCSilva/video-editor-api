@@ -16,6 +16,7 @@ import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
+import com.l8group.videoeditor.requests.VideoFileRequest;
 import com.l8group.videoeditor.utils.VideoDuration;
 
 @Service
@@ -29,10 +30,11 @@ public class VideoFileService {
         this.videoFileRepository = videoFileRepository;
     }
 
-    public List<UUID> uploadVideo(MultipartFile[] files, List<String> rejectedFiles) {
+    public List<UUID> uploadVideo(List<VideoFileRequest> videoFileRequests, List<String> rejectedFiles) {
         List<UUID> processedFiles = new ArrayList<>();
 
-        for (MultipartFile file : files) {
+        for (VideoFileRequest request : videoFileRequests) {
+            MultipartFile file = request.getFile();
             String fileFormat = getFileExtension(file.getOriginalFilename());
 
             if (!isSupportedFormat(fileFormat)) {
@@ -43,10 +45,8 @@ public class VideoFileService {
                 rejectedFiles.add(file.getOriginalFilename() + " (Arquivo corrompido ou ilegível)");
             } else {
                 try {
-                    // Salva o arquivo no sistema de arquivos
                     String filePath = saveFile(file);
 
-                    // Verifica se o arquivo foi salvo corretamente
                     File savedFile = new File(filePath);
                     if (!savedFile.exists()) {
                         logger.error("Arquivo não encontrado no caminho: {}", filePath);
@@ -54,7 +54,6 @@ public class VideoFileService {
                         continue;
                     }
 
-                    // Cria o objeto VideoFile
                     VideoFile videoFile = new VideoFile();
                     videoFile.setFileName(file.getOriginalFilename());
                     videoFile.setFileSize(file.getSize());
@@ -62,19 +61,15 @@ public class VideoFileService {
                     videoFile.setUploadedAt(ZonedDateTime.now());
                     videoFile.setStatus(VideoStatus.PROCESSING);
 
-                    // Define o caminho do arquivo
                     videoFile.setFilePath(filePath);
 
-                    // Calcula a duração do vídeo
                     logger.debug("Calculando a duração do vídeo para o arquivo: {}", filePath);
                     Long videoDuration = VideoDuration.getVideoDurationInSeconds(filePath);
                     videoFile.setDuration(videoDuration);
                     logger.debug("Duração do vídeo: {}", videoDuration);
 
-                    // Salva os metadados no banco de dados
                     videoFileRepository.save(videoFile);
 
-                    // Adiciona o ID à lista de processados
                     processedFiles.add(videoFile.getId());
 
                     logger.info("Metadados do vídeo salvos com sucesso para o arquivo: {}", file.getOriginalFilename());
@@ -87,6 +82,23 @@ public class VideoFileService {
 
         return processedFiles;
     }
+
+    public List<VideoFileResponseDTO> getAllVideos() {
+        List<VideoFile> videoFiles = videoFileRepository.findAll();
+        List<VideoFileResponseDTO> videoFileDTOs = new ArrayList<>();
+    
+        for (VideoFile videoFile : videoFiles) {
+            VideoFileResponseDTO dto = new VideoFileResponseDTO(
+                videoFile.getFileName(),
+                videoFile.getUploadedAt(),
+                videoFile.getStatus()
+            );
+            videoFileDTOs.add(dto);
+        }
+        
+        return videoFileDTOs;
+    }
+    
 
     private String saveFile(MultipartFile file) throws IOException {
         String uploadDir = "/mnt/c/Users/micha/OneDrive/Documentos/video-editor-api/videos/";
@@ -126,9 +138,5 @@ public class VideoFileService {
             logger.error("Erro ao validar conteúdo do vídeo: {}", e.getMessage(), e);
             throw new IllegalArgumentException("Erro ao validar o conteúdo do vídeo.");
         }
-    }
-
-    public List<VideoFileResponseDTO> getAllVideos() {
-        return videoFileRepository.findAllVideos();
     }
 }

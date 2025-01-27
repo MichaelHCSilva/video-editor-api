@@ -22,4 +22,3 @@ public enum OverlayPosition {
         return position;
     }
 }
-

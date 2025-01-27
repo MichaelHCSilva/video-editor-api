@@ -7,7 +7,6 @@ import com.l8group.videoeditor.enums.VideoStatus;
 
 import jakarta.persistence.*;
 
-
 @Entity
 @Table(name = "videos_files")
 public class VideoFile {
@@ -35,7 +34,7 @@ public class VideoFile {
     @Column(name = "duration", nullable = false)
     private Long duration;
 
-    @Column(name = "file_path")  
+    @Column(name = "file_path")
     private String filePath;
 
     public UUID getId() {
@@ -101,6 +100,5 @@ public class VideoFile {
     public void setFilePath(String filePath) {
         this.filePath = filePath;
     }
-
 
 }

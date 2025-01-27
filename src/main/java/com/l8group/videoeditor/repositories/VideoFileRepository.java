@@ -13,9 +13,8 @@ import com.l8group.videoeditor.models.VideoFile;
 @Repository
 public interface VideoFileRepository extends JpaRepository<VideoFile, UUID> {
 
-    @Query("SELECT new com.l8group.videoeditor.dtos.VideoFileResponseDTO(v.fileName, v.uploadedAt, v.status, v.duration) " +
-           "FROM VideoFile v")
+    @Query("SELECT new com.l8group.videoeditor.dtos.VideoFileResponseDTO(v.fileName, v.uploadedAt, v.status) " +
+            "FROM VideoFile v")
     List<VideoFileResponseDTO> findAllVideos();
 
 }
-

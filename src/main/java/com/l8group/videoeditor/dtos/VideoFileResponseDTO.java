@@ -9,13 +9,12 @@ public class VideoFileResponseDTO {
     private String fileName;
     private ZonedDateTime uploadedAt;
     private VideoStatus status;
-    private Long duration;
-
-    public VideoFileResponseDTO(String fileName, ZonedDateTime uploadedAt, VideoStatus status, Long duration) {
+    
+    public VideoFileResponseDTO(String fileName, ZonedDateTime uploadedAt, VideoStatus status) {
         this.fileName = fileName;
         this.uploadedAt = uploadedAt;
         this.status = status;
-        this.duration = duration;
+        
     }
 
     public String getFileName() {
@@ -42,12 +41,5 @@ public class VideoFileResponseDTO {
         this.status = status;
     }
 
-    public Long getDuration() {
-        return duration;
-    }
-
-    public void setDuration(Long duration) {
-        this.duration = duration;
-    }
 
 }
