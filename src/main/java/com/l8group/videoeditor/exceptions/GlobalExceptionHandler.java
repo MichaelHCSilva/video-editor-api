@@ -36,4 +36,9 @@ public class GlobalExceptionHandler {
         ErrorResponse errorResponse = new ErrorResponse("500", ex.getMessage());
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
+
+    @ExceptionHandler(InvalidFileException.class)
+    public ResponseEntity<String> handleInvalidFileException(InvalidFileException e) {
+        return ResponseEntity.badRequest().body(e.getMessage());
+    }
 }

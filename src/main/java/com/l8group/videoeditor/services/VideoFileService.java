@@ -25,9 +25,13 @@ public class VideoFileService {
     private static final Logger logger = LoggerFactory.getLogger(VideoFileService.class);
 
     private final VideoFileRepository videoFileRepository;
+    private final VideoValidationService validationService;
 
-    public VideoFileService(VideoFileRepository videoFileRepository) {
+    private final String uploadDir = "/mnt/c/Users/micha/OneDrive/Documentos/video-editor-api/videos/";
+
+    public VideoFileService(VideoFileRepository videoFileRepository, VideoValidationService validationService) {
         this.videoFileRepository = videoFileRepository;
+        this.validationService = validationService;
     }
 
     public List<UUID> uploadVideo(List<VideoFileRequest> videoFileRequests, List<String> rejectedFiles) {
@@ -35,48 +39,34 @@ public class VideoFileService {
 
         for (VideoFileRequest request : videoFileRequests) {
             MultipartFile file = request.getFile();
-            String fileFormat = getFileExtension(file.getOriginalFilename());
+            String fileFormat = validationService.getFileExtension(file.getOriginalFilename());
 
-            if (!isSupportedFormat(fileFormat)) {
+            if (!validationService.isSupportedFormat(fileFormat)) {
                 rejectedFiles.add(file.getOriginalFilename() + " (Formato inválido)");
-            } else if (file.isEmpty()) {
-                rejectedFiles.add(file.getOriginalFilename() + " (Arquivo vazio)");
-            } else if (!isValidVideoContent(file)) {
-                rejectedFiles.add(file.getOriginalFilename() + " (Arquivo corrompido ou ilegível)");
-            } else {
-                try {
-                    String filePath = saveFile(file);
+                continue;
+            }
 
-                    File savedFile = new File(filePath);
-                    if (!savedFile.exists()) {
-                        logger.error("Arquivo não encontrado no caminho: {}", filePath);
-                        rejectedFiles.add(file.getOriginalFilename() + " (Arquivo não encontrado)");
-                        continue;
-                    }
+            try {
+                String filePath = saveFile(file);
 
-                    VideoFile videoFile = new VideoFile();
-                    videoFile.setFileName(file.getOriginalFilename());
-                    videoFile.setFileSize(file.getSize());
-                    videoFile.setFileFormat(fileFormat);
-                    videoFile.setUploadedAt(ZonedDateTime.now());
-                    videoFile.setStatus(VideoStatus.PROCESSING);
+                VideoFile videoFile = new VideoFile();
+                videoFile.setFileName(file.getOriginalFilename());
+                videoFile.setFileSize(file.getSize());
+                videoFile.setFileFormat(fileFormat);
+                videoFile.setUploadedAt(ZonedDateTime.now());
+                videoFile.setStatus(VideoStatus.PROCESSING);
+                videoFile.setFilePath(filePath);
 
-                    videoFile.setFilePath(filePath);
+                Long duration = VideoDuration.getVideoDurationInSeconds(filePath);
+                videoFile.setDuration(duration);
 
-                    logger.debug("Calculando a duração do vídeo para o arquivo: {}", filePath);
-                    Long videoDuration = VideoDuration.getVideoDurationInSeconds(filePath);
-                    videoFile.setDuration(videoDuration);
-                    logger.debug("Duração do vídeo: {}", videoDuration);
+                videoFileRepository.save(videoFile);
+                processedFiles.add(videoFile.getId());
 
-                    videoFileRepository.save(videoFile);
-
-                    processedFiles.add(videoFile.getId());
-
-                    logger.info("Metadados do vídeo salvos com sucesso para o arquivo: {}", file.getOriginalFilename());
-                } catch (IOException | InterruptedException e) {
-                    logger.error("Erro ao processar o arquivo {}: {}", file.getOriginalFilename(), e.getMessage());
-                    rejectedFiles.add(file.getOriginalFilename() + " (Erro ao processar a duração)");
-                }
+                logger.info("Arquivo processado: {}", file.getOriginalFilename());
+            } catch (IOException | InterruptedException e) {
+                logger.error("Erro ao processar o arquivo {}: {}", file.getOriginalFilename(), e.getMessage());
+                rejectedFiles.add(file.getOriginalFilename() + " (Erro ao salvar ou processar)");
             }
         }
 
@@ -86,57 +76,29 @@ public class VideoFileService {
     public List<VideoFileResponseDTO> getAllVideos() {
         List<VideoFile> videoFiles = videoFileRepository.findAll();
         List<VideoFileResponseDTO> videoFileDTOs = new ArrayList<>();
-    
+
         for (VideoFile videoFile : videoFiles) {
-            VideoFileResponseDTO dto = new VideoFileResponseDTO(
+            videoFileDTOs.add(new VideoFileResponseDTO(
                 videoFile.getFileName(),
                 videoFile.getUploadedAt(),
                 videoFile.getStatus()
-            );
-            videoFileDTOs.add(dto);
+            ));
         }
-        
+
         return videoFileDTOs;
     }
-    
 
     private String saveFile(MultipartFile file) throws IOException {
-        String uploadDir = "/mnt/c/Users/micha/OneDrive/Documentos/video-editor-api/videos/";
-        String filePath = uploadDir + file.getOriginalFilename();
-
+        String uniqueFileName = UUID.randomUUID() + "." + validationService.getFileExtension(file.getOriginalFilename());
         File directory = new File(uploadDir);
+
         if (!directory.exists()) {
             directory.mkdirs();
-            logger.debug("Diretório criado: {}", uploadDir);
         }
 
-        File destinationFile = new File(filePath);
-        file.transferTo(destinationFile);
+        String filePath = uploadDir + uniqueFileName;
+        file.transferTo(new File(filePath));
 
-        logger.debug("Arquivo salvo no caminho: {}", filePath);
         return filePath;
-    }
-
-    private boolean isSupportedFormat(String fileFormat) {
-        return fileFormat.equalsIgnoreCase("mp4")
-                || fileFormat.equalsIgnoreCase("avi")
-                || fileFormat.equalsIgnoreCase("mov");
-    }
-
-    private String getFileExtension(String fileName) {
-        if (fileName == null || !fileName.contains(".")) {
-            logger.error("Nome do arquivo inválido: {}", fileName);
-            throw new IllegalArgumentException("O nome do arquivo é inválido ou não possui uma extensão válida.");
-        }
-        return fileName.substring(fileName.lastIndexOf('.') + 1);
-    }
-
-    private boolean isValidVideoContent(MultipartFile file) {
-        try {
-            return file.getSize() > 0;
-        } catch (Exception e) {
-            logger.error("Erro ao validar conteúdo do vídeo: {}", e.getMessage(), e);
-            throw new IllegalArgumentException("Erro ao validar o conteúdo do vídeo.");
-        }
     }
 }

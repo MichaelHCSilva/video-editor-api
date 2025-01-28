@@ -31,6 +31,7 @@ import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
 import com.l8group.videoeditor.services.VideoOverlayService;
 import com.l8group.videoeditor.services.VideoResizeService;
+import com.l8group.videoeditor.services.VideoValidationService;
 
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -45,65 +46,64 @@ public class VideoFileController {
     private final VideoCutService videoCutService;
     private final VideoResizeService videoResizeService;
     private final VideoOverlayService videoOverlayService;
+    private final VideoValidationService videoValidationService;
 
     public VideoFileController(VideoFileService videoFileService, VideoCutService videoCutService,
-            VideoResizeService videoResizeService, VideoOverlayService videoOverlayService) {
+            VideoResizeService videoResizeService, VideoOverlayService videoOverlayService,
+            VideoValidationService videoValidationService) {
         this.videoFileService = videoFileService;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
         this.videoOverlayService = videoOverlayService;
+        this.videoValidationService = videoValidationService;
     }
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadVideos(@RequestParam(value = "files", required = false) MultipartFile[] files) {
         if (files == null) {
-            return ResponseEntity.badRequest().body(
-                    Map.of("message", "O parâmetro 'files' é obrigatório. Certifique-se de usar o nome correto."));
+            return createErrorResponse("O parâmetro 'files' é obrigatório. Certifique-se de usar o nome correto.");
         }
 
-        if (files.length == 0 || allFilesAreEmpty(files)) {
-            return ResponseEntity.badRequest().body(
-                    Map.of("message",
-                            "Nenhum arquivo foi enviado. Por favor, selecione ao menos um arquivo de vídeo."));
+        if (files.length == 0 || videoValidationService.allFilesAreEmpty(files)) {
+            return createErrorResponse(
+                    "Nenhum arquivo foi enviado. Por favor, selecione ao menos um arquivo de vídeo.");
         }
 
-        List<VideoFileRequest> videoFileRequests = new ArrayList<>();
-        for (MultipartFile file : files) {
-            videoFileRequests.add(new VideoFileRequest(file));
+        List<VideoFileRequest> videoFileRequests = videoValidationService.createVideoFileRequests(files);
+        if (videoFileRequests.isEmpty()) {
+            return createErrorResponse(
+                    "Todos os arquivos enviados são inválidos ou incompatíveis com os formatos aceitos.");
         }
 
         List<String> rejectedFiles = new ArrayList<>();
         List<UUID> processedFiles = videoFileService.uploadVideo(videoFileRequests, rejectedFiles);
 
-        if (processedFiles.isEmpty() && rejectedFiles.isEmpty()) {
-            return ResponseEntity.badRequest().body(
-                    Map.of("message",
-                            "Nenhum arquivo válido foi enviado. Por favor, tente novamente com arquivos de vídeo."));
+        if (processedFiles.isEmpty()) {
+            return createErrorResponse("Nenhum arquivo foi processado. Todos os arquivos enviados foram rejeitados.",
+                    Map.of("rejected", rejectedFiles));
         }
 
-        if (processedFiles.isEmpty() && !rejectedFiles.isEmpty()) {
-            return ResponseEntity.badRequest().body(
-                    Map.of("message", "Nenhum arquivo foi processado. Todos os arquivos enviados foram rejeitados.",
-                            "rejected", rejectedFiles));
-        }
+        return createSuccessResponse(processedFiles, rejectedFiles);
+    }
 
+    private ResponseEntity<?> createErrorResponse(String message) {
+        return ResponseEntity.badRequest().body(Map.of("message", message));
+    }
+
+    private ResponseEntity<?> createErrorResponse(String message, Map<String, Object> additionalData) {
+        Map<String, Object> response = new HashMap<>(additionalData);
+        response.put("message", message);
+        return ResponseEntity.badRequest().body(response);
+    }
+
+    private ResponseEntity<?> createSuccessResponse(List<UUID> processedFiles, List<String> rejectedFiles) {
         Map<String, Object> response = new HashMap<>();
         response.put("message", "Upload concluído com sucesso.");
         response.put("processed", processedFiles);
         if (!rejectedFiles.isEmpty()) {
             response.put("rejected", rejectedFiles);
         }
-
-        return ResponseEntity.ok().body(response);
-    }
-
-    private boolean allFilesAreEmpty(MultipartFile[] files) {
-        for (MultipartFile file : files) {
-            if (file != null && !file.isEmpty()) {
-                return false;
-            }
-        }
-        return true;
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
@@ -128,9 +128,11 @@ public class VideoFileController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (IOException e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Erro ao cortar o vídeo. Detalhes: " + e.getMessage()));
+            return ResponseEntity.status(500)
+                    .body(Map.of("message", "Erro ao cortar o vídeo. Detalhes: " + e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Ocorreu um erro inesperado ao processar o vídeo."));
+            return ResponseEntity.status(500)
+                    .body(Map.of("message", "Ocorreu um erro inesperado ao processar o vídeo."));
         }
     }
 
