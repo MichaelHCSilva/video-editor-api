@@ -17,7 +17,7 @@ import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoFileRequest;
-import com.l8group.videoeditor.utils.VideoDuration;
+import com.l8group.videoeditor.utils.VideoDurationUtils;
 
 @Service
 public class VideoFileService {
@@ -57,7 +57,8 @@ public class VideoFileService {
                 videoFile.setStatus(VideoStatus.PROCESSING);
                 videoFile.setFilePath(filePath);
 
-                Long duration = VideoDuration.getVideoDurationInSeconds(filePath);
+                // Corrigir para chamar o método da classe VideoDurationUtils
+                Long duration = VideoDurationUtils.getVideoDuration(filePath).getSeconds(); 
                 videoFile.setDuration(duration);
 
                 videoFileRepository.save(videoFile);
@@ -71,6 +72,20 @@ public class VideoFileService {
         }
 
         return processedFiles;
+    }
+
+    private String saveFile(MultipartFile file) throws IOException {
+        String uniqueFileName = UUID.randomUUID() + "." + validationService.getFileExtension(file.getOriginalFilename());
+        File directory = new File(uploadDir);
+
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
+        String filePath = uploadDir + uniqueFileName;
+        file.transferTo(new File(filePath));
+
+        return filePath;
     }
 
     public List<VideoFileResponseDTO> getAllVideos() {
@@ -88,17 +103,4 @@ public class VideoFileService {
         return videoFileDTOs;
     }
 
-    private String saveFile(MultipartFile file) throws IOException {
-        String uniqueFileName = UUID.randomUUID() + "." + validationService.getFileExtension(file.getOriginalFilename());
-        File directory = new File(uploadDir);
-
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
-
-        String filePath = uploadDir + uniqueFileName;
-        file.transferTo(new File(filePath));
-
-        return filePath;
-    }
 }

@@ -1,5 +1,7 @@
 package com.l8group.videoeditor.requests;
 
+import java.time.Duration;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
@@ -24,19 +26,28 @@ public class VideoCutRequest {
         this.videoId = videoId;
     }
 
-    public String getStartTime() {
-        return startTime;
+    public Duration getStartTime() {
+        return convertToDuration(startTime);
     }
 
     public void setStartTime(String startTime) {
         this.startTime = startTime;
     }
 
-    public String getEndTime() {
-        return endTime;
+    public Duration getEndTime() {
+        return convertToDuration(endTime);
     }
 
     public void setEndTime(String endTime) {
         this.endTime = endTime;
+    }
+
+    private Duration convertToDuration(String timeString) {
+        String[] timeParts = timeString.split(":");
+        int hours = Integer.parseInt(timeParts[0]);
+        int minutes = Integer.parseInt(timeParts[1]);
+        double seconds = Double.parseDouble(timeParts[2]);
+
+        return Duration.ofHours(hours).plusMinutes(minutes).plusSeconds((long) seconds);
     }
 }

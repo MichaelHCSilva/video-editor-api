@@ -23,6 +23,7 @@ import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
+import com.l8group.videoeditor.exceptions.VideoProcessingException;
 import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.requests.VideoFileRequest;
@@ -106,31 +107,31 @@ public class VideoFileController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping
-    public ResponseEntity<?> getVideos() {
+    @GetMapping("/videos")
+    public ResponseEntity<List<VideoFileResponseDTO>> getAllVideos() {
         List<VideoFileResponseDTO> videos = videoFileService.getAllVideos();
-
-        if (videos.isEmpty()) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Nenhum vídeo encontrado.");
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(response);
-        }
-
         return ResponseEntity.ok(videos);
     }
 
     @PostMapping("/edit/cut")
     public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutRequest videoCutRequest) {
         try {
+            // Chama o serviço para cortar o vídeo
             VideoCutResponseDTO response = videoCutService.cutVideo(videoCutRequest);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(response); // Retorna a resposta com sucesso
+        } catch (VideoProcessingException e) {
+            // Tratamento específico para VideoProcessingException
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (IOException e) {
+            // Tratamento específico para IOException
             return ResponseEntity.status(500)
-                    .body(Map.of("message", "Erro ao cortar o vídeo. Detalhes: " + e.getMessage()));
+                    .body(Map.of("message", "Erro ao processar o vídeo. Detalhes: " + e.getMessage()));
+        } catch (InterruptedException e) {
+            // Tratamento específico para InterruptedException
+            return ResponseEntity.status(500)
+                    .body(Map.of("message", "Processo interrompido durante o corte do vídeo."));
         } catch (Exception e) {
+            // Tratamento genérico para outras exceções
             return ResponseEntity.status(500)
                     .body(Map.of("message", "Ocorreu um erro inesperado ao processar o vídeo."));
         }

@@ -3,15 +3,16 @@ package com.l8group.videoeditor.utils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.time.Duration;
 import java.util.concurrent.TimeUnit;
 
-public class VideoDuration {
+public class VideoDurationUtils {
 
-    public static Long getVideoDurationInSeconds(String videoFilePath) throws IOException, InterruptedException {
+    public static Duration getVideoDuration(String videoFilePath) throws IOException, InterruptedException {
         String[] command = {
             "ffmpeg", 
             "-i", videoFilePath, 
-            "2>&1"
+            "2>&1"  
         };
 
         ProcessBuilder processBuilder = new ProcessBuilder(command);
@@ -41,7 +42,7 @@ public class VideoDuration {
                     long totalSeconds = TimeUnit.HOURS.toSeconds(hours)
                             + TimeUnit.MINUTES.toSeconds(minutes)
                             + (long) seconds;
-                    return totalSeconds;
+                    return Duration.ofSeconds(totalSeconds);
                 }
             }
         }
@@ -49,8 +50,8 @@ public class VideoDuration {
         throw new IOException("Não foi possível obter a duração do vídeo.");
     }
 
-    // Método para formatar a duração do vídeo em HH:mm:ss
-    public static String formatDuration(long seconds) {
+    public static String formatDuration(Duration duration) {
+        long seconds = duration.getSeconds(); 
         long hours = seconds / 3600;
         long minutes = (seconds % 3600) / 60;
         long sec = seconds % 60;
