@@ -24,10 +24,10 @@ import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
 import com.l8group.videoeditor.exceptions.VideoProcessingException;
-import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.requests.VideoFileRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
+import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
 import com.l8group.videoeditor.services.VideoOverlayService;
@@ -138,15 +138,14 @@ public class VideoFileController {
     }
 
     @PostMapping("/edit/resize")
-    public ResponseEntity<?> resizeVideo(@RequestBody @Valid VideoResizeResponseDTO videoResizeDTO) {
+    public ResponseEntity<?> resizeVideo(@RequestBody @Valid VideoResizeRequest videoResizeRequest) {
         try {
-            VideoResize resizedVideo = videoResizeService.resizeVideo(videoResizeDTO);
+            VideoResizeResponseDTO resizedVideo = videoResizeService.resizeVideo(videoResizeRequest);
             return ResponseEntity.ok(resizedVideo);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body("{\"message\": \"" + e.getMessage() + "\"}");
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.status(500)
-                    .body("{\"message\": \"Erro interno do servidor: " + e.getMessage() + "\"}");
+            return ResponseEntity.status(500).body(Map.of("message", "Erro interno do servidor."));
         }
     }
 

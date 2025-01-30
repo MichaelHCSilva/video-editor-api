@@ -4,21 +4,22 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
-import com.l8group.videoeditor.enums.VideoResolution;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.repositories.VideoResizeRepository;
+import com.l8group.videoeditor.requests.VideoResizeRequest;
+import com.l8group.videoeditor.utils.VideoResolutions;
 
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
@@ -27,10 +28,9 @@ import jakarta.validation.Valid;
 public class VideoResizeService {
 
     private static final Logger logger = LoggerFactory.getLogger(VideoResizeService.class);
-
     private final VideoFileRepository videoFileRepository;
     private final VideoResizeRepository videoResizeRepository;
-    private final String outputSubdirectory = "resized-videos";
+    private static final String OUTPUT_SUBDIR = "resized-videos";
 
     public VideoResizeService(VideoFileRepository videoFileRepository, VideoResizeRepository videoResizeRepository) {
         this.videoFileRepository = videoFileRepository;
@@ -38,164 +38,122 @@ public class VideoResizeService {
     }
 
     @Transactional
-    public VideoResize resizeVideo(@Valid VideoResizeResponseDTO videoResizeDTO) throws Exception {
-        logger.info("Iniciando o processo de redimensionamento de vídeo: {}", videoResizeDTO);
+    public VideoResizeResponseDTO resizeVideo(@Valid VideoResizeRequest videoResizeRequest) throws Exception {
+        logger.info("Iniciando redimensionamento: {}", videoResizeRequest);
 
-        if (videoResizeDTO.getVideoId() == null || videoResizeDTO.getVideoId().isBlank()) {
-            logger.error("O ID do vídeo é obrigatório.");
+        if (videoResizeRequest.getVideoId() == null || videoResizeRequest.getVideoId().isBlank()) {
             throw new IllegalArgumentException("O ID do vídeo é obrigatório.");
         }
-
-        logger.debug("Buscando vídeo com ID: {}", videoResizeDTO.getVideoId());
-        Optional<VideoFile> optionalVideoFile = videoFileRepository
-                .findById(UUID.fromString(videoResizeDTO.getVideoId()));
-        if (optionalVideoFile.isEmpty()) {
-            logger.error("Vídeo com ID {} não encontrado.", videoResizeDTO.getVideoId());
-            throw new IllegalArgumentException("O vídeo com o ID fornecido não foi encontrado.");
-        }
-        VideoFile originalVideo = optionalVideoFile.get();
-        logger.info("Vídeo encontrado: {}", originalVideo);
-
-        if (videoResizeDTO.getWidth() <= 0 || videoResizeDTO.getHeight() <= 0) {
-            logger.error("Resolução inválida: {}x{}", videoResizeDTO.getWidth(), videoResizeDTO.getHeight());
-            throw new IllegalArgumentException("A largura e altura devem ser maiores que zero.");
+        if (videoResizeRequest.getWidth() == 0 || videoResizeRequest.getHeight() == 0) {
+            throw new IllegalArgumentException("A largura e altura são obrigatórias para o redimensionamento.");
         }
 
-        if (!isResolutionSupported(videoResizeDTO.getWidth(), videoResizeDTO.getHeight())) {
-            String supportedResolutions = getSupportedResolutions();
-            logger.error("Resolução não suportada: {}x{}. Resoluções suportadas: {}",
-                    videoResizeDTO.getWidth(), videoResizeDTO.getHeight(), supportedResolutions);
-            throw new IllegalArgumentException(
-                    "Resolução não suportada: " + videoResizeDTO.getWidth() + "x" + videoResizeDTO.getHeight()
-                            + ". Resoluções suportadas: " + supportedResolutions);
-        }
+        VideoFile originalVideo = getVideoById(videoResizeRequest.getVideoId());
+        validateResolution(videoResizeRequest.getWidth(), videoResizeRequest.getHeight());
 
-        // Verificar se já existe um vídeo redimensionado com as mesmas dimensões
-        Optional<VideoResize> existingResize = videoResizeRepository.findByVideoFileAndResolution(
-                originalVideo,
-                VideoResolution.fromDimensions(videoResizeDTO.getWidth(), videoResizeDTO.getHeight()));
+        String resolution = videoResizeRequest.getWidth() + "x" + videoResizeRequest.getHeight();
+
+        Optional<VideoResize> existingResize = videoResizeRepository.findByVideoFileAndResolution(originalVideo,
+                resolution);
         if (existingResize.isPresent()) {
-            logger.warn("Vídeo com essa resolução já existe: {}x{}", videoResizeDTO.getWidth(),
-                    videoResizeDTO.getHeight());
-            throw new IllegalArgumentException("Vídeo com essa resolução já existe.");
+            logger.warn("O vídeo '{}' já foi redimensionado para {} anteriormente.", originalVideo.getFileName(),
+                    resolution);
+            throw new IllegalStateException(
+                    "Já existe um vídeo redimensionado para a resolução " + resolution + " associado a este ID.");
         }
 
         String originalFilePath = convertToWSLPath(originalVideo.getFilePath());
-        if (originalFilePath == null || originalFilePath.isBlank()) {
-            logger.error("Caminho do vídeo original inválido.");
-            throw new IllegalArgumentException("Caminho do vídeo original é inválido.");
+        String outputDirectory = getOutputDirectory(originalFilePath);
+        createDirectoryIfNotExists(outputDirectory);
+
+        String resizedFileName = generateFileName(originalVideo, resolution);
+        String resizedFilePath = outputDirectory + File.separator + resizedFileName;
+
+        executeFFmpeg(originalFilePath, videoResizeRequest.getWidth(), videoResizeRequest.getHeight(), resizedFilePath);
+        verifyFileExists(resizedFilePath);
+
+        VideoResize videoResize = saveResizedVideo(originalVideo, resizedFileName, resolution);
+
+        return new VideoResizeResponseDTO(videoResize.getFileName(), videoResize.getResolution(),
+                videoResize.getUploadedAt());
+    }
+
+    private VideoFile getVideoById(String videoId) {
+        try {
+            UUID uuid = UUID.fromString(videoId);
+            return videoFileRepository.findById(uuid)
+                    .orElseThrow(() -> new IllegalArgumentException("Nenhum vídeo encontrado para o ID fornecido."));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("O ID do vídeo fornecido é inválido.");
         }
-        logger.debug("Caminho do vídeo original (convertido): {}", originalFilePath);
+    }
 
-        String outputDirectoryPath = getOutputDirectoryPath(originalFilePath);
-        logger.debug("Criando diretório de saída: {}", outputDirectoryPath);
-        createDirectoryIfNotExists(outputDirectoryPath);
-
-        String resizedFileName = generateResizedFileName(originalVideo, videoResizeDTO.getWidth(),
-                videoResizeDTO.getHeight());
-        String resizedFilePath = outputDirectoryPath + File.separator + resizedFileName;
-        logger.info("Caminho do vídeo redimensionado: {}", resizedFilePath);
-
-        executeResizeCommand(originalFilePath, videoResizeDTO.getWidth(), videoResizeDTO.getHeight(), resizedFilePath);
-
-        verifyResizedFileExistence(resizedFilePath);
-
-        VideoResize videoResize = new VideoResize();
-        videoResize.setVideoFile(originalVideo);
-        videoResize.setFileName(resizedFileName);
-        videoResize.setStatus(VideoStatus.PROCESSING);
-        videoResize.setResolution(VideoResolution.fromDimensions(videoResizeDTO.getWidth(), videoResizeDTO.getHeight()));
-        videoResize.setUploadedAt(java.time.ZonedDateTime.now());
-
-        logger.info("Salvando metadados do vídeo redimensionado no banco de dados.");
-        return videoResizeRepository.save(videoResize);
+    private void validateResolution(int width, int height) {
+        if (!VideoResolutions.isValidResolution(width, height)) {
+            throw new IllegalArgumentException(
+                    "A resolução fornecida é inválida. Resoluções suportadas: " + getSupportedResolutions());
+        }
     }
 
     private String convertToWSLPath(String filePath) {
-        String convertedPath = filePath;
-        if (filePath != null && filePath.startsWith("C:\\")) {
-            convertedPath = "/mnt/c/" + filePath.substring(3).replace("\\", "/");
-        }
-        logger.debug("Convertendo caminho para WSL: {} -> {}", filePath, convertedPath);
-        return convertedPath;
+        return filePath.startsWith("C:\\") ? "/mnt/c/" + filePath.substring(3).replace("\\", "/") : filePath;
     }
 
-    private String getOutputDirectoryPath(String originalFilePath) {
-        File originalFile = new File(originalFilePath);
-        return originalFile.getParent() + File.separator + outputSubdirectory;
+    private String getOutputDirectory(String originalFilePath) {
+        return new File(originalFilePath).getParent() + File.separator + OUTPUT_SUBDIR;
     }
 
-    private void createDirectoryIfNotExists(String directoryPath) {
-        File directory = new File(directoryPath);
-        if (!directory.exists()) {
-            logger.debug("Criando diretório: {}", directoryPath);
+    private void createDirectoryIfNotExists(String path) {
+        File directory = new File(path);
+        if (!directory.exists())
             directory.mkdirs();
-        }
     }
 
-    private String generateResizedFileName(VideoFile originalVideo, int width, int height) {
-        String originalFileFormat = originalVideo.getFileFormat();
-        // Modificando a geração do nome para incluir resolução e formato
-        String resizedFileName = originalVideo.getFileName().replace("." + originalFileFormat,
-                "_resized_" + width + "x" + height + "." + originalFileFormat);
-
-        logger.debug("Gerando nome do arquivo redimensionado: {}", resizedFileName);
-        return resizedFileName;
+    private String generateFileName(VideoFile video, String resolution) {
+        return video.getFileName().replace("." + video.getFileFormat(),
+                "_resized_" + resolution + "." + video.getFileFormat());
     }
 
-    private void executeResizeCommand(String originalFilePath, int width, int height, String resizedFilePath)
+    private void executeFFmpeg(String input, int width, int height, String output)
             throws IOException, InterruptedException {
         String[] command = {
-                "ffmpeg", "-i", originalFilePath,
+                "ffmpeg", "-i", input,
                 "-vf", "scale=" + width + ":" + height,
                 "-c:v", "libx264",
                 "-preset", "fast",
                 "-crf", "23",
                 "-c:a", "aac",
-                "-strict", "experimental",
-                resizedFilePath
+                output
         };
 
-        logger.info("Executando comando FFmpeg: {}", String.join(" ", command));
-        ProcessBuilder processBuilder = new ProcessBuilder(command);
-        processBuilder.redirectErrorStream(true);
-        Process process = processBuilder.start();
-
+        Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                logger.debug(line);
-            }
+            reader.lines().forEach(logger::debug);
         }
 
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            logger.error("Erro ao executar FFmpeg. Código de saída: {}", exitCode);
-            throw new IOException("Erro ao executar o comando FFmpeg. Código de saída: " + exitCode);
+        if (process.waitFor() != 0) {
+            throw new IOException("Erro ao executar FFmpeg.");
         }
     }
 
-    private void verifyResizedFileExistence(String resizedFilePath) throws IOException {
-        File resizedFile = new File(resizedFilePath);
-        if (!resizedFile.exists()) {
-            logger.error("Falha ao criar o arquivo de vídeo redimensionado: {}", resizedFilePath);
-            throw new IOException("Falha ao criar o arquivo de vídeo redimensionado.");
+    private void verifyFileExists(String path) throws IOException {
+        if (!new File(path).exists()) {
+            throw new IOException("Falha ao criar o arquivo de vídeo.");
         }
-        logger.info("Arquivo de vídeo redimensionado criado com sucesso: {}", resizedFilePath);
     }
 
-    private boolean isResolutionSupported(int width, int height) {
-        try {
-            VideoResolution.fromDimensions(width, height);
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
+    private VideoResize saveResizedVideo(VideoFile video, String fileName, String resolution) {
+        VideoResize videoResize = new VideoResize();
+        videoResize.setVideoFile(video);
+        videoResize.setFileName(fileName);
+        videoResize.setResolution(resolution);
+        videoResize.setStatus(VideoStatus.PROCESSING);
+        videoResize.setUploadedAt(ZonedDateTime.now());
+
+        return videoResizeRepository.save(videoResize);
     }
 
     private String getSupportedResolutions() {
-        return java.util.Arrays.stream(VideoResolution.values())
-                .map(res -> res.getWidth() + "x" + res.getHeight())
-                .collect(Collectors.joining(", "));
+        return String.join(", ", VideoResolutions.getValidResolutions());
     }
 }

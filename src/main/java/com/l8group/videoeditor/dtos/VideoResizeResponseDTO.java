@@ -1,46 +1,49 @@
 package com.l8group.videoeditor.dtos;
 
-import com.l8group.videoeditor.enums.VideoResolution;
-
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Positive;
+import java.time.ZonedDateTime;
 
 public class VideoResizeResponseDTO {
+    private String fileName;
+    private String resolution;
+    private ZonedDateTime date;
+    private String message;
 
-    @NotBlank(message = "O ID do vídeo é obrigatório.")
-    private String videoId;
-
-    @Positive(message = "A largura deve ser maior que zero.")
-    private int width;
-
-    @Positive(message = "A altura deve ser maior que zero.")
-    private int height;
-
-    public String getVideoId() {
-        return videoId;
+    public VideoResizeResponseDTO(String fileName, String resolution, ZonedDateTime date) {
+        this.fileName = fileName;
+        this.resolution = resolution;
+        this.date = date;
+        this.message = "O vídeo foi redimensionado com sucesso.";
     }
 
-    public void setVideoId(String videoId) {
-        this.videoId = videoId;
+    public String getFileName() {
+        return fileName;
     }
 
-    public int getWidth() {
-        return width;
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
     }
 
-    public void setWidth(int width) {
-        this.width = width;
+    public String getResolution() {
+        return resolution;
     }
 
-    public int getHeight() {
-        return height;
+    public void setResolution(String resolution) {
+        this.resolution = resolution;
     }
 
-    public void setHeight(int height) {
-        this.height = height;
+    public ZonedDateTime getDate() {
+        return date;
     }
 
-    public VideoResolution getResolution() {
-        return VideoResolution.fromDimensions(width, height);
+    public void setDate(ZonedDateTime date) {
+        this.date = date;
+    }
+
+    public String getMessage() {
+        return message;
+    }
+
+    public void setMessage(String message) {
+        this.message = message;
     }
 }

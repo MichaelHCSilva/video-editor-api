@@ -3,7 +3,6 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
-import com.l8group.videoeditor.enums.VideoResolution;
 import com.l8group.videoeditor.enums.VideoStatus;
 
 import jakarta.persistence.*;
@@ -23,16 +22,15 @@ public class VideoResize {
     @Column(name = "file_name", nullable = false)
     private String fileName;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
     private VideoStatus status;
 
     @Column(name = "uploaded_at", nullable = false)
     private ZonedDateTime uploadedAt;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "resolution", nullable = false)
-    private VideoResolution resolution;
+    private String resolution; // Agora salva apenas "1280x720", "1920x1080" etc.
 
     public UUID getId() {
         return id;
@@ -74,12 +72,11 @@ public class VideoResize {
         this.uploadedAt = uploadedAt;
     }
 
-    public VideoResolution getResolution() {
+    public String getResolution() {
         return resolution;
     }
 
-    public void setResolution(VideoResolution resolution) {
+    public void setResolution(String resolution) {
         this.resolution = resolution;
     }
-
 }
