@@ -19,15 +19,18 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.l8group.videoeditor.dtos.VideoConversionsDTO;
 import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
 import com.l8group.videoeditor.exceptions.VideoProcessingException;
+import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.requests.VideoFileRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
+import com.l8group.videoeditor.services.VideoConversionService;
 import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
 import com.l8group.videoeditor.services.VideoOverlayService;
@@ -48,15 +51,17 @@ public class VideoFileController {
     private final VideoResizeService videoResizeService;
     private final VideoOverlayService videoOverlayService;
     private final VideoValidationService videoValidationService;
+    private final VideoConversionService videoConversionService;
 
     public VideoFileController(VideoFileService videoFileService, VideoCutService videoCutService,
             VideoResizeService videoResizeService, VideoOverlayService videoOverlayService,
-            VideoValidationService videoValidationService) {
+            VideoValidationService videoValidationService, VideoConversionService videoConversionService) {
         this.videoFileService = videoFileService;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
         this.videoOverlayService = videoOverlayService;
         this.videoValidationService = videoValidationService;
+        this.videoConversionService = videoConversionService;
     }
 
     @PostMapping("/upload")
@@ -166,4 +171,20 @@ public class VideoFileController {
                     .body(Map.of("message", "Ocorreu um erro inesperado ao aplicar a sobreposição de texto."));
         }
     }
+
+    @PostMapping("/convert")
+    public ResponseEntity<Map<String, Object>> convertVideo(@Valid @RequestBody VideoConversionRequest request) {
+        try {
+            VideoConversionsDTO response = videoConversionService.convertVideo(request);
+            return ResponseEntity.ok(Map.of("message", "Conversão realizada com sucesso", "data", response));
+        } catch (IllegalArgumentException | VideoProcessingException e) {
+            // Handle IllegalArgumentException and VideoProcessingException
+            return ResponseEntity.status(400).body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            // General exception handling for unexpected errors
+            return ResponseEntity.status(500)
+                    .body(Map.of("message", "Erro ao processar a conversão.", "details", e.getMessage()));
+        }
+    }
+
 }

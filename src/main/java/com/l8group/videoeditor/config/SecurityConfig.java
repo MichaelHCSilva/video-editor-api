@@ -13,14 +13,15 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/").permitAll()  // Permite acesso à raiz
+                .requestMatchers("/").permitAll()  
                 .requestMatchers("/api/videos").permitAll()
                 .requestMatchers("/api/videos/upload").permitAll()
                 .requestMatchers("/api/videos/edit/cut").permitAll()
                 .requestMatchers("/api/videos/edit/resize").permitAll()
                 .requestMatchers("/api/videos/edit/overlay-text").permitAll()
+                .requestMatchers("/api/videos/convert").permitAll()
                 .requestMatchers("/error").permitAll() 
-                .anyRequest().authenticated()  // Exige autenticação para todas as outras requisições
+                .anyRequest().authenticated()  
             );
         return http.build();
     }
