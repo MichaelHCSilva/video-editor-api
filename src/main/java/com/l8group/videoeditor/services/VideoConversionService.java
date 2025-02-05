@@ -34,7 +34,8 @@ public class VideoConversionService {
     private final VideoFileRepository videoFileRepository;
     private final VideoConversionRepository videoConversionRepository;
 
-    public VideoConversionService(VideoFileRepository videoFileRepository, VideoConversionRepository videoConversionRepository) {
+    public VideoConversionService(VideoFileRepository videoFileRepository,
+            VideoConversionRepository videoConversionRepository) {
         this.videoFileRepository = videoFileRepository;
         this.videoConversionRepository = videoConversionRepository;
     }
@@ -102,24 +103,16 @@ public class VideoConversionService {
     }
 
     private String generateFileName(VideoFile originalVideo, String targetFormat, String videoId) {
-        // Extrai o nome base do arquivo original, removendo a extensão
         String baseName = originalVideo.getFileName().replaceAll("\\.[^.]+$", "");
-    
-        // Obtém a data atual para o timestamp (formato: yyyyMMdd)
         String timestamp = new SimpleDateFormat("yyyyMMdd").format(new Date());
-    
-        // Gera o nome do arquivo no formato desejado, usando os primeiros 8 caracteres do UUID
         String fileName = baseName + "_" + videoId.substring(0, 8) + "_" + timestamp + "_converted." + targetFormat;
-    
-        // Log do nome gerado para verificar
         logger.info("Nome do arquivo gerado: {}", fileName);
-    
-        // Retorna o nome final do arquivo
+
         return fileName;
     }
-    
 
-    private void executeFFmpegConversion(String inputFilePath, String outputFilePath) throws IOException, InterruptedException {
+    private void executeFFmpegConversion(String inputFilePath, String outputFilePath)
+            throws IOException, InterruptedException {
         String[] command = {
                 "ffmpeg", "-i", inputFilePath,
                 "-c:v", "libx264", "-crf", "18", "-preset", "slow",

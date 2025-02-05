@@ -30,7 +30,7 @@ public class VideoResize {
     private ZonedDateTime uploadedAt;
 
     @Column(name = "resolution", nullable = false)
-    private String resolution; // Agora salva apenas "1280x720", "1920x1080" etc.
+    private String resolution;
 
     public UUID getId() {
         return id;

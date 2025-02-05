@@ -30,12 +30,14 @@ import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.requests.VideoFileRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
+import com.l8group.videoeditor.services.BatchProcessingService;
 import com.l8group.videoeditor.services.VideoConversionService;
 import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
 import com.l8group.videoeditor.services.VideoOverlayService;
 import com.l8group.videoeditor.services.VideoResizeService;
 import com.l8group.videoeditor.services.VideoValidationService;
+import com.l8group.videoeditor.requests.BatchProcessingRequest;
 
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -52,16 +54,19 @@ public class VideoFileController {
     private final VideoOverlayService videoOverlayService;
     private final VideoValidationService videoValidationService;
     private final VideoConversionService videoConversionService;
+    private final BatchProcessingService batchProcessingService;
 
     public VideoFileController(VideoFileService videoFileService, VideoCutService videoCutService,
             VideoResizeService videoResizeService, VideoOverlayService videoOverlayService,
-            VideoValidationService videoValidationService, VideoConversionService videoConversionService) {
+            VideoValidationService videoValidationService, VideoConversionService videoConversionService,
+            BatchProcessingService batchProcessingService) {
         this.videoFileService = videoFileService;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
         this.videoOverlayService = videoOverlayService;
         this.videoValidationService = videoValidationService;
         this.videoConversionService = videoConversionService;
+        this.batchProcessingService = batchProcessingService;
     }
 
     @PostMapping("/upload")
@@ -121,22 +126,17 @@ public class VideoFileController {
     @PostMapping("/edit/cut")
     public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutRequest videoCutRequest) {
         try {
-            // Chama o serviço para cortar o vídeo
             VideoCutResponseDTO response = videoCutService.cutVideo(videoCutRequest);
-            return ResponseEntity.ok(response); // Retorna a resposta com sucesso
+            return ResponseEntity.ok(response); 
         } catch (VideoProcessingException e) {
-            // Tratamento específico para VideoProcessingException
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (IOException e) {
-            // Tratamento específico para IOException
             return ResponseEntity.status(500)
                     .body(Map.of("message", "Erro ao processar o vídeo. Detalhes: " + e.getMessage()));
         } catch (InterruptedException e) {
-            // Tratamento específico para InterruptedException
             return ResponseEntity.status(500)
                     .body(Map.of("message", "Processo interrompido durante o corte do vídeo."));
         } catch (Exception e) {
-            // Tratamento genérico para outras exceções
             return ResponseEntity.status(500)
                     .body(Map.of("message", "Ocorreu um erro inesperado ao processar o vídeo."));
         }
@@ -178,12 +178,23 @@ public class VideoFileController {
             VideoConversionsDTO response = videoConversionService.convertVideo(request);
             return ResponseEntity.ok(Map.of("message", "Conversão realizada com sucesso", "data", response));
         } catch (IllegalArgumentException | VideoProcessingException e) {
-            // Handle IllegalArgumentException and VideoProcessingException
             return ResponseEntity.status(400).body(Map.of("message", e.getMessage()));
         } catch (Exception e) {
-            // General exception handling for unexpected errors
             return ResponseEntity.status(500)
                     .body(Map.of("message", "Erro ao processar a conversão.", "details", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/batch-process")
+    public ResponseEntity<String> processBatch(@Valid @RequestBody BatchProcessingRequest batchRequest) {
+        logger.info("Recebida solicitação para processamento em lote de vídeos. IDs: {}", batchRequest.getVideoIds());
+
+        try {
+            batchProcessingService.processBatch(batchRequest);
+            return ResponseEntity.ok("Processamento em lote iniciado com sucesso.");
+        } catch (IOException | InterruptedException e) {
+            logger.error("Erro ao processar vídeos em lote: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body("Erro ao processar vídeos em lote.");
         }
     }
 

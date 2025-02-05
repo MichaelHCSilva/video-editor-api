@@ -6,16 +6,7 @@ import java.util.UUID;
 import com.l8group.videoeditor.enums.OverlayPosition;
 import com.l8group.videoeditor.enums.VideoStatus;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 
 @Entity
 @Table(name = "videos_overlay")
@@ -97,11 +88,11 @@ public class VideoOverlay {
         this.overlayPosition = overlayPosition;
     }
 
-    public int getFontSize() {  // Método getter para o tamanho da fonte
+    public int getFontSize() {  
         return fontSize;
     }
 
-    public void setFontSize(int fontSize) {  // Método setter para o tamanho da fonte
+    public void setFontSize(int fontSize) {  
         this.fontSize = fontSize;
     }
 

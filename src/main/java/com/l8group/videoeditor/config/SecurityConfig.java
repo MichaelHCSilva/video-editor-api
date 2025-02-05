@@ -19,6 +19,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/videos/edit/cut").permitAll()
                 .requestMatchers("/api/videos/edit/resize").permitAll()
                 .requestMatchers("/api/videos/edit/overlay-text").permitAll()
+                .requestMatchers("/api/videos/batch-process").permitAll()
                 .requestMatchers("/api/videos/convert").permitAll()
                 .requestMatchers("/error").permitAll() 
                 .anyRequest().authenticated()  
