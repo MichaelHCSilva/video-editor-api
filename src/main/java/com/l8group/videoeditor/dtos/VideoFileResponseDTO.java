@@ -2,10 +2,10 @@ package com.l8group.videoeditor.dtos;
 
 import java.time.ZonedDateTime;
 
+
 import com.l8group.videoeditor.enums.VideoStatus;
 
 public class VideoFileResponseDTO {
-
     private String fileName;
     private ZonedDateTime uploadedAt;
     private VideoStatus status;
@@ -14,7 +14,6 @@ public class VideoFileResponseDTO {
         this.fileName = fileName;
         this.uploadedAt = uploadedAt;
         this.status = status;
-        
     }
 
     public String getFileName() {
@@ -40,6 +39,5 @@ public class VideoFileResponseDTO {
     public void setStatus(VideoStatus status) {
         this.status = status;
     }
-
 
 }

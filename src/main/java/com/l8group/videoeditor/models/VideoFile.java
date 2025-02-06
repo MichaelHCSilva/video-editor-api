@@ -24,6 +24,9 @@ public class VideoFile {
     @Column(name = "file_format", nullable = false)
     private String fileFormat;
 
+    @Column(name = "created_at", nullable = false)
+    private ZonedDateTime createdAt;
+
     @Column(name = "uploaded_at", nullable = false)
     private ZonedDateTime uploadedAt;
 
@@ -67,6 +70,14 @@ public class VideoFile {
 
     public void setFileFormat(String fileFormat) {
         this.fileFormat = fileFormat;
+    }
+
+    public ZonedDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(ZonedDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 
     public ZonedDateTime getUploadedAt() {

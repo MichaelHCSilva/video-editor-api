@@ -1,11 +1,8 @@
 package com.l8group.videoeditor.controllers;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +22,9 @@ import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
 import com.l8group.videoeditor.exceptions.VideoProcessingException;
+import com.l8group.videoeditor.requests.BatchProcessingRequest;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.requests.VideoCutRequest;
-import com.l8group.videoeditor.requests.VideoFileRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.services.BatchProcessingService;
@@ -36,8 +33,6 @@ import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
 import com.l8group.videoeditor.services.VideoOverlayService;
 import com.l8group.videoeditor.services.VideoResizeService;
-import com.l8group.videoeditor.services.VideoValidationService;
-import com.l8group.videoeditor.requests.BatchProcessingRequest;
 
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -52,82 +47,40 @@ public class VideoFileController {
     private final VideoCutService videoCutService;
     private final VideoResizeService videoResizeService;
     private final VideoOverlayService videoOverlayService;
-    private final VideoValidationService videoValidationService;
+
     private final VideoConversionService videoConversionService;
     private final BatchProcessingService batchProcessingService;
 
     public VideoFileController(VideoFileService videoFileService, VideoCutService videoCutService,
             VideoResizeService videoResizeService, VideoOverlayService videoOverlayService,
-            VideoValidationService videoValidationService, VideoConversionService videoConversionService,
+            VideoConversionService videoConversionService,
             BatchProcessingService batchProcessingService) {
         this.videoFileService = videoFileService;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
         this.videoOverlayService = videoOverlayService;
-        this.videoValidationService = videoValidationService;
+
         this.videoConversionService = videoConversionService;
         this.batchProcessingService = batchProcessingService;
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<?> uploadVideos(@RequestParam(value = "files", required = false) MultipartFile[] files) {
-        if (files == null) {
-            return createErrorResponse("O parâmetro 'files' é obrigatório. Certifique-se de usar o nome correto.");
-        }
-
-        if (files.length == 0 || videoValidationService.allFilesAreEmpty(files)) {
-            return createErrorResponse(
-                    "Nenhum arquivo foi enviado. Por favor, selecione ao menos um arquivo de vídeo.");
-        }
-
-        List<VideoFileRequest> videoFileRequests = videoValidationService.createVideoFileRequests(files);
-        if (videoFileRequests.isEmpty()) {
-            return createErrorResponse(
-                    "Todos os arquivos enviados são inválidos ou incompatíveis com os formatos aceitos.");
-        }
-
-        List<String> rejectedFiles = new ArrayList<>();
-        List<UUID> processedFiles = videoFileService.uploadVideo(videoFileRequests, rejectedFiles);
-
-        if (processedFiles.isEmpty()) {
-            return createErrorResponse("Nenhum arquivo foi processado. Todos os arquivos enviados foram rejeitados.",
-                    Map.of("rejected", rejectedFiles));
-        }
-
-        return createSuccessResponse(processedFiles, rejectedFiles);
+    public ResponseEntity<?> uploadVideos(
+            @Valid @RequestParam(value = "files", required = false) MultipartFile[] files) {
+        return videoFileService.handleUpload(files);
     }
 
-    private ResponseEntity<?> createErrorResponse(String message) {
-        return ResponseEntity.badRequest().body(Map.of("message", message));
-    }
-
-    private ResponseEntity<?> createErrorResponse(String message, Map<String, Object> additionalData) {
-        Map<String, Object> response = new HashMap<>(additionalData);
-        response.put("message", message);
-        return ResponseEntity.badRequest().body(response);
-    }
-
-    private ResponseEntity<?> createSuccessResponse(List<UUID> processedFiles, List<String> rejectedFiles) {
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Upload concluído com sucesso.");
-        response.put("processed", processedFiles);
-        if (!rejectedFiles.isEmpty()) {
-            response.put("rejected", rejectedFiles);
-        }
-        return ResponseEntity.ok(response);
-    }
-
-    @GetMapping("/videos")
+    @GetMapping
     public ResponseEntity<List<VideoFileResponseDTO>> getAllVideos() {
-        List<VideoFileResponseDTO> videos = videoFileService.getAllVideos();
-        return ResponseEntity.ok(videos);
+        List<VideoFileResponseDTO> videoFileResponseDTOS = videoFileService.getAllVideos();
+        return ResponseEntity.ok(videoFileResponseDTOS);
     }
 
     @PostMapping("/edit/cut")
     public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutRequest videoCutRequest) {
         try {
             VideoCutResponseDTO response = videoCutService.cutVideo(videoCutRequest);
-            return ResponseEntity.ok(response); 
+            return ResponseEntity.ok(response);
         } catch (VideoProcessingException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (IOException e) {

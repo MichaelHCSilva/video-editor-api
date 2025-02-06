@@ -2,14 +2,24 @@ package com.l8group.videoeditor.services;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.task.TaskExecutor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
@@ -26,56 +36,92 @@ public class VideoFileService {
 
     private final VideoFileRepository videoFileRepository;
     private final VideoValidationService validationService;
+    private final VideoDurationUtils videoDurationUtils;
+    private final TaskExecutor taskExecutor;
 
-    private final String uploadDir = "/mnt/c/Users/micha/OneDrive/Documentos/video-editor-api/videos/";
+    private final String uploadDir = System.getProperty("user.dir") + "/videos/";
 
-    public VideoFileService(VideoFileRepository videoFileRepository, VideoValidationService validationService) {
+    @Autowired
+    public VideoFileService(VideoFileRepository videoFileRepository, VideoValidationService validationService,
+            VideoDurationUtils videoDurationUtils, TaskExecutor taskExecutor) {
         this.videoFileRepository = videoFileRepository;
         this.validationService = validationService;
+        this.videoDurationUtils = videoDurationUtils;
+        this.taskExecutor = taskExecutor;
     }
 
-    public List<UUID> uploadVideo(List<VideoFileRequest> videoFileRequests, List<String> rejectedFiles) {
-        List<UUID> processedFiles = new ArrayList<>();
-
-        for (VideoFileRequest request : videoFileRequests) {
-            MultipartFile file = request.getFile();
-            String fileFormat = validationService.getFileExtension(file.getOriginalFilename());
-
-            if (!validationService.isSupportedFormat(fileFormat)) {
-                rejectedFiles.add(file.getOriginalFilename() + " (Formato inválido)");
-                continue;
-            }
-
-            try {
-                String filePath = saveFile(file);
-
-                VideoFile videoFile = new VideoFile();
-                videoFile.setFileName(file.getOriginalFilename());
-                videoFile.setFileSize(file.getSize());
-                videoFile.setFileFormat(fileFormat);
-                videoFile.setUploadedAt(ZonedDateTime.now());
-                videoFile.setStatus(VideoStatus.PROCESSING);
-                videoFile.setFilePath(filePath);
-
-                // Corrigir para chamar o método da classe VideoDurationUtils
-                Long duration = VideoDurationUtils.getVideoDuration(filePath).getSeconds(); 
-                videoFile.setDuration(duration);
-
-                videoFileRepository.save(videoFile);
-                processedFiles.add(videoFile.getId());
-
-                logger.info("Arquivo processado: {}", file.getOriginalFilename());
-            } catch (IOException | InterruptedException e) {
-                logger.error("Erro ao processar o arquivo {}: {}", file.getOriginalFilename(), e.getMessage());
-                rejectedFiles.add(file.getOriginalFilename() + " (Erro ao salvar ou processar)");
-            }
+    public ResponseEntity<?> handleUpload(MultipartFile[] files) {
+        if (files == null || files.length == 0 || validationService.allFilesAreEmpty(files)) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Nenhum arquivo válido enviado."));
         }
 
-        return processedFiles;
+        List<VideoFileRequest> videoFileRequests = validationService.createVideoFileRequests(files);
+        if (videoFileRequests.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Todos os arquivos são inválidos."));
+        }
+
+        // Esperar a conclusão do processamento antes de responder
+        List<UUID> processedFiles = uploadVideo(videoFileRequests).join();
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Upload concluído.");
+        response.put("processed_ids", processedFiles);
+
+        return ResponseEntity.ok(response);
     }
 
-    private String saveFile(MultipartFile file) throws IOException {
-        String uniqueFileName = UUID.randomUUID() + "." + validationService.getFileExtension(file.getOriginalFilename());
+    public CompletableFuture<List<UUID>> uploadVideo(List<VideoFileRequest> videoFileRequests) {
+        ConcurrentLinkedQueue<String> rejectedFiles = new ConcurrentLinkedQueue<>();
+        ConcurrentLinkedQueue<UUID> processedFiles = new ConcurrentLinkedQueue<>();
+
+        List<CompletableFuture<Void>> futures = videoFileRequests.stream()
+                .map(request -> CompletableFuture
+                        .runAsync(() -> processVideoFile(request, rejectedFiles, processedFiles), taskExecutor)
+                        .exceptionally(ex -> {
+                            logger.error("Erro ao processar vídeo {}: {}", request.getFile().getOriginalFilename(),
+                                    ex.getMessage());
+                            rejectedFiles.add(request.getFile().getOriginalFilename() + " (Erro inesperado)");
+                            return null;
+                        }))
+                .collect(Collectors.toList());
+
+        return CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+                .thenApply(v -> new ArrayList<>(processedFiles));
+
+    }
+
+    private void processVideoFile(VideoFileRequest request, ConcurrentLinkedQueue<String> rejectedFiles,
+            ConcurrentLinkedQueue<UUID> processedFiles) {
+        MultipartFile file = request.getFile();
+        String fileFormat = validationService.getFileExtension(file.getOriginalFilename());
+
+        if (!validationService.isSupportedFormat(fileFormat)) {
+            rejectedFiles.add(file.getOriginalFilename() + " (Formato inválido: " + fileFormat + ")");
+            return;
+        }
+
+        try {
+            String filePath = saveFile(file, fileFormat);
+            VideoFile videoFile = createVideoFile(file, fileFormat, filePath);
+            saveVideoFile(videoFile);
+
+            processedFiles.add(videoFile.getId());
+
+            videoDurationUtils.getVideoDurationAsync(filePath).thenAccept(duration -> {
+                videoFile.setDuration(duration.getSeconds());
+                videoFileRepository.save(videoFile);
+                logger.info("Duração do vídeo {}: {} segundos", videoFile.getFileName(), duration.getSeconds());
+            });
+
+            logger.info("Arquivo processado: {}", file.getOriginalFilename());
+        } catch (IOException e) {
+            logger.error("Erro ao salvar/processar {}: {}", file.getOriginalFilename(), e.getMessage());
+            rejectedFiles.add(file.getOriginalFilename() + " (Erro ao salvar/processar)");
+        }
+    }
+
+    private String saveFile(MultipartFile file, String fileFormat) throws IOException {
+        String uniqueFileName = generateFileName(file, fileFormat);
         File directory = new File(uploadDir);
 
         if (!directory.exists()) {
@@ -88,19 +134,46 @@ public class VideoFileService {
         return filePath;
     }
 
-    public List<VideoFileResponseDTO> getAllVideos() {
-        List<VideoFile> videoFiles = videoFileRepository.findAll();
-        List<VideoFileResponseDTO> videoFileDTOs = new ArrayList<>();
-
-        for (VideoFile videoFile : videoFiles) {
-            videoFileDTOs.add(new VideoFileResponseDTO(
-                videoFile.getFileName(),
-                videoFile.getUploadedAt(),
-                videoFile.getStatus()
-            ));
+    private String generateFileName(MultipartFile file, String targetFormat) {
+        if (file == null) {
+            throw new IllegalArgumentException("O arquivo não pode ser nulo.");
         }
 
-        return videoFileDTOs;
+        String originalFileName = file.getOriginalFilename();
+        if (originalFileName == null || originalFileName.trim().isEmpty()) {
+            throw new IllegalArgumentException("O nome do arquivo não pode ser nulo ou vazio.");
+        }
+
+        String baseName = originalFileName.replaceAll("\\.[^.]+$", "");
+        String timestamp = new SimpleDateFormat("yyyyMMdd").format(new java.util.Date());
+
+        String videoId = UUID.randomUUID().toString();
+
+        String fileName = baseName + "_" + videoId.substring(0, 8) + "_" + timestamp + "." + targetFormat;
+        logger.info("Nome do arquivo gerado: {}", fileName);
+
+        return fileName;
     }
 
+    private VideoFile createVideoFile(MultipartFile file, String fileFormat, String filePath) {
+        VideoFile videoFile = new VideoFile();
+        videoFile.setFileName(file.getOriginalFilename());
+        videoFile.setFileSize(file.getSize());
+        videoFile.setFileFormat(fileFormat);
+        videoFile.setCreatedAt(ZonedDateTime.now());
+        videoFile.setUploadedAt(ZonedDateTime.now());
+        videoFile.setStatus(VideoStatus.PROCESSING);
+        videoFile.setFilePath(filePath);
+        videoFile.setDuration(0L);
+        return videoFile;
+    }
+
+    @Transactional
+    private void saveVideoFile(VideoFile videoFile) {
+        videoFileRepository.save(videoFile);
+    }
+
+    public List<VideoFileResponseDTO> getAllVideos() {
+        return videoFileRepository.findAllVideos();
+    }
 }
