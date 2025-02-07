@@ -28,6 +28,9 @@ public class VideoCut {
     @Column(name = "uploaded_at", nullable = false)
     private ZonedDateTime uploadedAt;
 
+    @Column(name = "created_at", nullable = false)
+    private ZonedDateTime createdAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private VideoStatus status;
@@ -72,6 +75,14 @@ public class VideoCut {
         this.uploadedAt = uploadedAt;
     }
 
+    public ZonedDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(ZonedDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public VideoStatus getStatus() {
         return status;
     }
@@ -79,6 +90,14 @@ public class VideoCut {
     public void setStatus(VideoStatus status) {
         this.status = status;
     }
-    
 
+
+
+
+
+
+
+
+
+    
 }

@@ -54,22 +54,39 @@ public class VideoFileService {
         if (files == null || files.length == 0 || validationService.allFilesAreEmpty(files)) {
             return ResponseEntity.badRequest().body(Map.of("message", "Nenhum arquivo válido enviado."));
         }
-
+    
         List<VideoFileRequest> videoFileRequests = validationService.createVideoFileRequests(files);
         if (videoFileRequests.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("message", "Todos os arquivos são inválidos."));
         }
-
-        // Esperar a conclusão do processamento antes de responder
+    
         List<UUID> processedFiles = uploadVideo(videoFileRequests).join();
-
+    
+        List<String> rejectedFiles = videoFileRequests.stream()
+                .filter(request -> !validationService.isSupportedFormat(validationService.getFileExtension(request.getFile().getOriginalFilename())))
+                .map(request -> request.getFile().getOriginalFilename() + " (Formato inválido)")
+                .collect(Collectors.toList());
+    
         Map<String, Object> response = new HashMap<>();
-        response.put("message", "Upload concluído.");
-        response.put("processed_ids", processedFiles);
-
+        
+        if (rejectedFiles.isEmpty()) {
+            if (!processedFiles.isEmpty()) {
+                response.put("message", "Upload concluído.");
+                response.put("processed_ids", processedFiles);
+            }
+        } else {
+            if (!processedFiles.isEmpty()) {
+                response.put("message", "Upload concluído.");
+                response.put("processed_ids", processedFiles);
+            } else {
+                response.put("message", "Nenhum arquivo válido enviado.");
+            }
+            response.put("rejected_files", rejectedFiles);
+        }
+    
         return ResponseEntity.ok(response);
     }
-
+    
     public CompletableFuture<List<UUID>> uploadVideo(List<VideoFileRequest> videoFileRequests) {
         ConcurrentLinkedQueue<String> rejectedFiles = new ConcurrentLinkedQueue<>();
         ConcurrentLinkedQueue<UUID> processedFiles = new ConcurrentLinkedQueue<>();

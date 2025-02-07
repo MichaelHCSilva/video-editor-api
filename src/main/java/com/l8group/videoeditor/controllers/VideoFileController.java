@@ -1,6 +1,7 @@
 package com.l8group.videoeditor.controllers;
 
 import java.io.IOException;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -18,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.l8group.videoeditor.dtos.VideoConversionsDTO;
 import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
+//import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
@@ -71,27 +73,36 @@ public class VideoFileController {
     }
 
     @GetMapping
-    public ResponseEntity<List<VideoFileResponseDTO>> getAllVideos() {
+    public ResponseEntity<?> getAllVideos() {
         List<VideoFileResponseDTO> videoFileResponseDTOS = videoFileService.getAllVideos();
+
+        if (videoFileResponseDTOS.isEmpty()) {
+            return ResponseEntity.ok(Map.of("message", "Nenhum vídeo encontrado"));
+        }
+
         return ResponseEntity.ok(videoFileResponseDTOS);
     }
 
     @PostMapping("/edit/cut")
-    public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutRequest videoCutRequest) {
+    public ResponseEntity<VideoCutResponseDTO> cutVideo(@RequestBody @Valid VideoCutRequest videoCutRequest) {
         try {
-            VideoCutResponseDTO response = videoCutService.cutVideo(videoCutRequest);
-            return ResponseEntity.ok(response);
+            VideoCutResponseDTO videoCutResponse = videoCutService.cutVideo(videoCutRequest);
+
+            return ResponseEntity.ok(videoCutResponse);
         } catch (VideoProcessingException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+            return ResponseEntity.badRequest().body(new VideoCutResponseDTO("", e.getMessage(), ZonedDateTime.now()));
         } catch (IOException e) {
             return ResponseEntity.status(500)
-                    .body(Map.of("message", "Erro ao processar o vídeo. Detalhes: " + e.getMessage()));
+                    .body(new VideoCutResponseDTO("", "Erro ao processar o vídeo. Detalhes: " + e.getMessage(),
+                            ZonedDateTime.now()));
         } catch (InterruptedException e) {
             return ResponseEntity.status(500)
-                    .body(Map.of("message", "Processo interrompido durante o corte do vídeo."));
+                    .body(new VideoCutResponseDTO("", "Processo interrompido durante o corte do vídeo.",
+                            ZonedDateTime.now()));
         } catch (Exception e) {
             return ResponseEntity.status(500)
-                    .body(Map.of("message", "Ocorreu um erro inesperado ao processar o vídeo."));
+                    .body(new VideoCutResponseDTO("", "Ocorreu um erro inesperado ao processar o vídeo.",
+                            ZonedDateTime.now()));
         }
     }
 
