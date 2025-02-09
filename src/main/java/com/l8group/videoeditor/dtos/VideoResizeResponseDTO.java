@@ -6,13 +6,12 @@ public class VideoResizeResponseDTO {
     private String fileName;
     private String resolution;
     private ZonedDateTime date;
-    private String message;
 
     public VideoResizeResponseDTO(String fileName, String resolution, ZonedDateTime date) {
         this.fileName = fileName;
         this.resolution = resolution;
         this.date = date;
-        this.message = "O vídeo foi redimensionado com sucesso.";
+
     }
 
     public String getFileName() {
@@ -39,11 +38,4 @@ public class VideoResizeResponseDTO {
         this.date = date;
     }
 
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
 }

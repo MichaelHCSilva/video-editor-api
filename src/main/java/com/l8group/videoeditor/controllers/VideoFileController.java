@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,11 +17,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.l8group.videoeditor.dtos.VideoConversionsDTO;
 import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
-//import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
@@ -49,7 +51,6 @@ public class VideoFileController {
     private final VideoCutService videoCutService;
     private final VideoResizeService videoResizeService;
     private final VideoOverlayService videoOverlayService;
-
     private final VideoConversionService videoConversionService;
     private final BatchProcessingService batchProcessingService;
 
@@ -61,7 +62,6 @@ public class VideoFileController {
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
         this.videoOverlayService = videoOverlayService;
-
         this.videoConversionService = videoConversionService;
         this.batchProcessingService = batchProcessingService;
     }
@@ -107,15 +107,28 @@ public class VideoFileController {
     }
 
     @PostMapping("/edit/resize")
-    public ResponseEntity<?> resizeVideo(@RequestBody @Valid VideoResizeRequest videoResizeRequest) {
-        try {
-            VideoResizeResponseDTO resizedVideo = videoResizeService.resizeVideo(videoResizeRequest);
-            return ResponseEntity.ok(resizedVideo);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("message", "Erro interno do servidor."));
-        }
+    public DeferredResult<ResponseEntity<Object>> resizeVideo(
+            @RequestBody @Valid VideoResizeRequest videoResizeRequest) {
+
+        DeferredResult<ResponseEntity<Object>> deferredResult = new DeferredResult<>(30 * 60 * 1000L); // 30 minutos
+        CompletableFuture<VideoResizeResponseDTO> future = videoResizeService.resizeVideo(videoResizeRequest);
+
+        future.thenAccept(responseDTO -> deferredResult.setResult(ResponseEntity.ok(responseDTO))).exceptionally(ex -> {
+            String errorMessage;
+
+            if (ex.getCause() != null) {
+                errorMessage = Objects.toString(ex.getCause().getMessage(), "Erro desconhecido ao processar o vídeo.");
+            } else {
+                errorMessage = Objects.toString(ex.getMessage(), "Erro desconhecido ao processar o vídeo.");
+            }
+
+            logger.error("Erro ao processar o vídeo: {}", errorMessage, ex);
+
+            deferredResult.setResult(ResponseEntity.badRequest().body(Map.of("message", errorMessage)));
+            return null;
+        });
+
+        return deferredResult;
     }
 
     @PostMapping("/edit/overlay-text")

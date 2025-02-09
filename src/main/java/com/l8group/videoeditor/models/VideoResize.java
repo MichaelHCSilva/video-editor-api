@@ -26,6 +26,9 @@ public class VideoResize {
     @Enumerated(EnumType.STRING)
     private VideoStatus status;
 
+    @Column(name = "created_at", nullable = false)
+    private ZonedDateTime createdAt;
+
     @Column(name = "uploaded_at", nullable = false)
     private ZonedDateTime uploadedAt;
 
@@ -64,6 +67,14 @@ public class VideoResize {
         this.status = status;
     }
 
+    public ZonedDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(ZonedDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
     public ZonedDateTime getUploadedAt() {
         return uploadedAt;
     }
@@ -79,4 +90,6 @@ public class VideoResize {
     public void setResolution(String resolution) {
         this.resolution = resolution;
     }
+
+    
 }

@@ -8,10 +8,10 @@ public class VideoResizeRequest {
     @NotBlank(message = "O ID do vídeo é obrigatório")
     private String videoId;
 
-    @Positive(message = "A largura deve ser maior que zero.")
+    @Positive(message = "A largura informada não atende aos requisitos. Certifique-se de que é um valor positivo e compatível com as resoluções suportadas.")
     private int width;
 
-    @Positive(message = "A altura deve ser maior que zero.")
+    @Positive(message = "A altura informada não atende aos requisitos. Certifique-se de que é um valor positivo e compatível com as resoluções suportadas.")
     private int height;
 
     public VideoResizeRequest() {

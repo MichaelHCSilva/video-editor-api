@@ -38,7 +38,7 @@ public class VideoCutService {
     }
 
     @Transactional
-    @Async
+    @Async("taskExecutor")
     public void cutVideoAsync(VideoCutRequest videoCutRequest) throws IOException, InterruptedException {
         VideoFile originalVideo = getOriginalVideo(videoCutRequest.getVideoId());
         String originalFilePath = convertToWSLPath(originalVideo.getFilePath());

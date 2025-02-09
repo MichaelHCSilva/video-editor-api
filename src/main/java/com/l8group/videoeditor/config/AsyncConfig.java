@@ -10,12 +10,12 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 @EnableAsync
 public class AsyncConfig {
 
-    @Bean
+    @Bean(name = "taskExecutor")
     public TaskExecutor taskExecutor() {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(20);  // Número mínimo de threads
-        executor.setMaxPoolSize(50);   // Número máximo de threads
-        executor.setQueueCapacity(500); // Tamanho da fila de tarefas
+        executor.setCorePoolSize(20);  
+        executor.setMaxPoolSize(50); 
+        executor.setQueueCapacity(500); 
         executor.setThreadNamePrefix("VideoUpload-");
         executor.initialize();
         return executor;
