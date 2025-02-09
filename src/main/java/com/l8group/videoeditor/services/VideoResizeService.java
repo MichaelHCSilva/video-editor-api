@@ -125,7 +125,7 @@ public class VideoResizeService {
             throw new IllegalArgumentException("O nome do arquivo original não pode ser nulo ou vazio.");
         }
 
-        String baseName = originalFileName.replaceAll("\\.[^.]+$", ""); // Remove a extensão
+        String baseName = originalFileName.replaceAll("\\.[^.]+$", ""); 
         String timestamp = new SimpleDateFormat("yyyyMMdd").format(new java.util.Date());
         String videoId = UUID.randomUUID().toString().substring(0, 8);
 
@@ -135,7 +135,8 @@ public class VideoResizeService {
     private void executeFFmpeg(String input, int width, int height, String output)
             throws IOException, InterruptedException {
         String[] command = {
-                "ffmpeg", "-i", input,
+                "ffmpeg", "-y", 
+                "-i", input,
                 "-vf", "scale=" + width + ":" + height,
                 "-c:v", "libx264",
                 "-preset", "fast",

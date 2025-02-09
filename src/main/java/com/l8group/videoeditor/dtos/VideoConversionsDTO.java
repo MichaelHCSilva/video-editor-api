@@ -9,14 +9,14 @@ public class VideoConversionsDTO {
     private String originalFilename;
     private String originalFormat;
     private String targetFormat;
-    private ZonedDateTime convertedAt;
+    private ZonedDateTime createdAt;
 
     public VideoConversionsDTO(VideoConversion videoConversion) {
 
         this.originalFilename = videoConversion.getVideoFile().getFileName();
         this.originalFormat = videoConversion.getFileFormat();
         this.targetFormat = videoConversion.getTargetFormat();
-        this.convertedAt = videoConversion.getUpdatedAt();
+        this.createdAt = videoConversion.getCreatedAt();
     }
 
     public String getOriginalFilename() {
@@ -43,12 +43,14 @@ public class VideoConversionsDTO {
         this.targetFormat = targetFormat;
     }
 
-    public ZonedDateTime getConvertedAt() {
-        return convertedAt;
+    public ZonedDateTime getCreatedAt() {
+        return createdAt;
     }
 
-    public void setConvertedAt(ZonedDateTime convertedAt) {
-        this.convertedAt = convertedAt;
+    public void setCreatedAt(ZonedDateTime createdAt) {
+        this.createdAt = createdAt;
     }
+
+   
 
 }

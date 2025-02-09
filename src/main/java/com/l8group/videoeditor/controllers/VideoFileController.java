@@ -21,6 +21,7 @@ import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.l8group.videoeditor.dtos.VideoConversionsDTO;
+//import com.l8group.videoeditor.dtos.VideoConversionsDTO;
 import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
@@ -150,16 +151,26 @@ public class VideoFileController {
     }
 
     @PostMapping("/convert")
-    public ResponseEntity<Map<String, Object>> convertVideo(@Valid @RequestBody VideoConversionRequest request) {
-        try {
-            VideoConversionsDTO response = videoConversionService.convertVideo(request);
-            return ResponseEntity.ok(Map.of("message", "Conversão realizada com sucesso", "data", response));
-        } catch (IllegalArgumentException | VideoProcessingException e) {
-            return ResponseEntity.status(400).body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500)
-                    .body(Map.of("message", "Erro ao processar a conversão.", "details", e.getMessage()));
-        }
+    public CompletableFuture<ResponseEntity<VideoConversionsDTO>> convertVideo(
+            @Valid @RequestBody VideoConversionRequest request) {
+
+        logger.info("Recebida solicitação de conversão para o vídeo ID: {}", request.getVideoId());
+
+        return videoConversionService.convertVideo(request)
+                .thenApplyAsync(dto -> {
+                    logger.info("Conversão concluída com sucesso para o vídeo ID: {}", request.getVideoId());
+                    return ResponseEntity.ok(dto);
+                })
+                .exceptionally(ex -> {
+                    Throwable cause = ex.getCause();
+                    logger.error("Erro ao processar a conversão para o vídeo ID: {} - {}", request.getVideoId(),
+                            cause.getMessage());
+
+                    if (cause instanceof IllegalArgumentException) {
+                        return ResponseEntity.status(400).body(null);
+                    }
+                    return ResponseEntity.status(500).body(null);
+                });
     }
 
     @PostMapping("/batch-process")

@@ -121,7 +121,7 @@ public class VideoOverlayService {
                 overlayRequest.getOverlayData(), fontPath, overlayRequest.getFontSize(), calculatedPosition);
 
         String[] overlayCommand = {
-                "ffmpeg", "-i", originalFilePath,
+                "ffmpeg", "-y", originalFilePath,
                 "-vf", brightnessFilter,
                 "-codec:v", "libx264", "-preset", "fast", "-crf", "18",
                 "-codec:a", "aac", "-b:a", "192k", "-strict", "-2", overlayFilePath

@@ -152,7 +152,8 @@ public class VideoCutService {
     private void executeCutCommand(String originalFilePath, Duration startTime, Duration endTime, String cutFilePath)
             throws IOException, InterruptedException {
         String[] command = {
-                "ffmpeg", "-i", originalFilePath,
+                "ffmpeg", "-y",
+                "-i", originalFilePath, 
                 "-ss", VideoDurationUtils.formatDuration(startTime),
                 "-to", VideoDurationUtils.formatDuration(endTime),
                 "-c:v", "libx264",
