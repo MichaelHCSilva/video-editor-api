@@ -23,7 +23,7 @@ public class VideoCut {
     private String fileName;
 
     @Column(name = "duration", nullable = false)
-    private Long duration;
+    private String duration; 
 
     @Column(name = "uploaded_at", nullable = false)
     private ZonedDateTime uploadedAt;
@@ -59,11 +59,11 @@ public class VideoCut {
         this.fileName = fileName;
     }
 
-    public Long getDuration() {
+    public String getDuration() {  // Agora retorna uma String formatada
         return duration;
     }
 
-    public void setDuration(Long duration) {
+    public void setDuration(String duration) {  // Agora recebe uma String
         this.duration = duration;
     }
 

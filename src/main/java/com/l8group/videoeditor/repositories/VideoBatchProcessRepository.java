@@ -8,6 +8,6 @@ import org.springframework.stereotype.Repository;
 import com.l8group.videoeditor.models.VideoBatchProcess;
 
 @Repository
-public interface BatchProcessingRepository extends JpaRepository<VideoBatchProcess, UUID> {
+public interface VideoBatchProcessRepository extends JpaRepository<VideoBatchProcess, UUID> {
 
 }

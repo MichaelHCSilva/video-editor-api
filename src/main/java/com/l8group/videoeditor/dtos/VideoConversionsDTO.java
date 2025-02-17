@@ -2,37 +2,34 @@ package com.l8group.videoeditor.dtos;
 
 import java.time.ZonedDateTime;
 
-import com.l8group.videoeditor.models.VideoConversion;
-
 public class VideoConversionsDTO {
 
-    private String originalFilename;
-    private String originalFormat;
+    private String fileName;
+    private String fileFormat;
     private String targetFormat;
     private ZonedDateTime createdAt;
 
-    public VideoConversionsDTO(VideoConversion videoConversion) {
-
-        this.originalFilename = videoConversion.getVideoFile().getFileName();
-        this.originalFormat = videoConversion.getFileFormat();
-        this.targetFormat = videoConversion.getTargetFormat();
-        this.createdAt = videoConversion.getCreatedAt();
+    public VideoConversionsDTO(String fileName, String fileFormat, String targetFormat, ZonedDateTime createdAt){
+        this.fileName = fileName; 
+        this.fileFormat = fileFormat;
+        this.targetFormat = targetFormat;
+        this.createdAt = createdAt;
     }
 
-    public String getOriginalFilename() {
-        return originalFilename;
+    public String getFileName() {
+        return fileName;
     }
 
-    public void setOriginalFilename(String originalFilename) {
-        this.originalFilename = originalFilename;
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
     }
 
-    public String getOriginalFormat() {
-        return originalFormat;
+    public String getFileFormat() {
+        return fileFormat;
     }
 
-    public void setOriginalFormat(String originalFormat) {
-        this.originalFormat = originalFormat;
+    public void setFileFormat(String fileFormat) {
+        this.fileFormat = fileFormat;
     }
 
     public String getTargetFormat() {
@@ -51,6 +48,7 @@ public class VideoConversionsDTO {
         this.createdAt = createdAt;
     }
 
+    
    
 
 }

@@ -58,18 +58,7 @@ public class VideoDurationUtils {
     private static Duration parseDuration(String durationLine) {
         try {
             String durationPart = durationLine.split("Duration: ")[1].split(",")[0].trim();
-            String[] durationParts = durationPart.split(":");
-    
-            if (durationParts.length == 3) {
-                int hours = Integer.parseInt(durationParts[0]);
-                int minutes = Integer.parseInt(durationParts[1]);
-                double seconds = Double.parseDouble(durationParts[2]);
-    
-                long totalSeconds = TimeUnit.HOURS.toSeconds(hours)
-                        + TimeUnit.MINUTES.toSeconds(minutes)
-                        + (long) seconds;
-                return Duration.ofSeconds(totalSeconds);
-            }
+            return convertToDuration(durationPart);
         } catch (ArrayIndexOutOfBoundsException | NumberFormatException | NullPointerException e) {
             logger.error("Erro ao analisar a duração do vídeo: {}", e.getMessage());
         }
@@ -82,5 +71,14 @@ public class VideoDurationUtils {
         long minutes = (seconds % 3600) / 60;
         long sec = seconds % 60;
         return String.format("%02d:%02d:%02d", hours, minutes, sec);
+    }
+
+    public static Duration convertToDuration(String timeString) {
+        String[] timeParts = timeString.split(":");
+        int hours = Integer.parseInt(timeParts[0]);
+        int minutes = Integer.parseInt(timeParts[1]);
+        double seconds = Double.parseDouble(timeParts[2]);
+
+        return Duration.ofHours(hours).plusMinutes(minutes).plusSeconds((long) seconds);
     }
 }

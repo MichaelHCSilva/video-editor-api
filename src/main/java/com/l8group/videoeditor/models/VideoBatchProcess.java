@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.UUID;
 
 import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.utils.OperationsConverterUtils;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -37,9 +39,10 @@ public class VideoBatchProcess {
     private ZonedDateTime createdAt;
 
     @Column(name = "updated_at", nullable = false)
-    private ZonedDateTime aupdatedAt;
+    private ZonedDateTime updatedAt;
 
-    @Column(columnDefinition = "json")
+    @Column(name = "operations", nullable = false)
+    @Convert(converter = OperationsConverterUtils.class) // Conversor personalizado
     private List<String> operations;
 
     public UUID getId() {
@@ -74,12 +77,12 @@ public class VideoBatchProcess {
         this.createdAt = createdAt;
     }
 
-    public ZonedDateTime getAupdatedAt() {
-        return aupdatedAt;
+    public ZonedDateTime getUpdatedAt() {
+        return updatedAt;
     }
 
-    public void setAupdatedAt(ZonedDateTime aupdatedAt) {
-        this.aupdatedAt = aupdatedAt;
+    public void setUpdatedAt(ZonedDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     public List<String> getOperations() {
@@ -89,7 +92,5 @@ public class VideoBatchProcess {
     public void setOperations(List<String> operations) {
         this.operations = operations;
     }
-
-
 
 }

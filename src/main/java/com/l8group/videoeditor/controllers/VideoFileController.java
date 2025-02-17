@@ -3,13 +3,7 @@ package com.l8group.videoeditor.controllers;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,172 +11,131 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.context.request.async.DeferredResult;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.dtos.VideoConversionsDTO;
-//import com.l8group.videoeditor.dtos.VideoConversionsDTO;
 import com.l8group.videoeditor.dtos.VideoCutResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
-import com.l8group.videoeditor.dtos.VideoOverlayResponseDTO;
 import com.l8group.videoeditor.dtos.VideoResizeResponseDTO;
-import com.l8group.videoeditor.exceptions.VideoProcessingException;
-import com.l8group.videoeditor.requests.BatchProcessingRequest;
+import com.l8group.videoeditor.dtos.VideoUploadResponseDTO;
+import com.l8group.videoeditor.requests.VideoBatchRequest;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.requests.VideoCutRequest;
-import com.l8group.videoeditor.requests.VideoOverlayRequest;
+import com.l8group.videoeditor.requests.VideoFileRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
-import com.l8group.videoeditor.services.BatchProcessingService;
+import com.l8group.videoeditor.services.VideoBatchService;
 import com.l8group.videoeditor.services.VideoConversionService;
 import com.l8group.videoeditor.services.VideoCutService;
 import com.l8group.videoeditor.services.VideoFileService;
-import com.l8group.videoeditor.services.VideoOverlayService;
 import com.l8group.videoeditor.services.VideoResizeService;
 
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/videos")
 public class VideoFileController {
 
-    private static final Logger logger = LoggerFactory.getLogger(VideoFileController.class);
+    // private static final Logger logger =
+    // LoggerFactory.getLogger(VideoFileController.class);
 
     private final VideoFileService videoFileService;
     private final VideoCutService videoCutService;
     private final VideoResizeService videoResizeService;
-    private final VideoOverlayService videoOverlayService;
+    //private final VideoFileRepository videoFileRepository;
+
     private final VideoConversionService videoConversionService;
-    private final BatchProcessingService batchProcessingService;
+    private final VideoBatchService videoBatchService;
 
     public VideoFileController(VideoFileService videoFileService, VideoCutService videoCutService,
-            VideoResizeService videoResizeService, VideoOverlayService videoOverlayService,
+            VideoResizeService videoResizeService,
             VideoConversionService videoConversionService,
-            BatchProcessingService batchProcessingService) {
+            VideoBatchService videoBatchService) {
         this.videoFileService = videoFileService;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
-        this.videoOverlayService = videoOverlayService;
+        
         this.videoConversionService = videoConversionService;
-        this.batchProcessingService = batchProcessingService;
+        this.videoBatchService = videoBatchService;
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<?> uploadVideos(
-            @Valid @RequestParam(value = "files", required = false) MultipartFile[] files) {
-        return videoFileService.handleUpload(files);
+    public ResponseEntity<VideoUploadResponseDTO> uploadVideo(@RequestParam("file") MultipartFile file) {
+        VideoFileRequest request = new VideoFileRequest(file);
+        VideoUploadResponseDTO response = videoFileService.uploadVideo(request);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    public ResponseEntity<?> getAllVideos() {
-        List<VideoFileResponseDTO> videoFileResponseDTOS = videoFileService.getAllVideos();
-
-        if (videoFileResponseDTOS.isEmpty()) {
-            return ResponseEntity.ok(Map.of("message", "Nenhum vídeo encontrado"));
-        }
-
-        return ResponseEntity.ok(videoFileResponseDTOS);
+    public ResponseEntity<List<VideoFileResponseDTO>> listAllVideos() {
+        List<VideoFileResponseDTO> videos = videoFileService.listAllVideos();
+        return ResponseEntity.ok(videos);
     }
 
     @PostMapping("/edit/cut")
-    public ResponseEntity<VideoCutResponseDTO> cutVideo(@RequestBody @Valid VideoCutRequest videoCutRequest) {
+    public ResponseEntity<?> cutVideo(@RequestBody @Valid VideoCutRequest videoCutRequest) {
         try {
-            VideoCutResponseDTO videoCutResponse = videoCutService.cutVideo(videoCutRequest);
-
-            return ResponseEntity.ok(videoCutResponse);
-        } catch (VideoProcessingException e) {
-            return ResponseEntity.badRequest().body(new VideoCutResponseDTO("", e.getMessage(), ZonedDateTime.now()));
-        } catch (IOException e) {
-            return ResponseEntity.status(500)
-                    .body(new VideoCutResponseDTO("", "Erro ao processar o vídeo. Detalhes: " + e.getMessage(),
-                            ZonedDateTime.now()));
-        } catch (InterruptedException e) {
-            return ResponseEntity.status(500)
-                    .body(new VideoCutResponseDTO("", "Processo interrompido durante o corte do vídeo.",
-                            ZonedDateTime.now()));
-        } catch (Exception e) {
-            return ResponseEntity.status(500)
-                    .body(new VideoCutResponseDTO("", "Ocorreu um erro inesperado ao processar o vídeo.",
-                            ZonedDateTime.now()));
+            VideoCutResponseDTO response = videoCutService.cutVideo(videoCutRequest);
+            return ResponseEntity.ok(response);
+        } catch (IOException | InterruptedException e) {
+            return ResponseEntity.internalServerError().body("Erro ao cortar o vídeo: " + e.getMessage());
         }
     }
 
     @PostMapping("/edit/resize")
-    public DeferredResult<ResponseEntity<Object>> resizeVideo(
+    public ResponseEntity<VideoResizeResponseDTO> resizeVideo(
             @RequestBody @Valid VideoResizeRequest videoResizeRequest) {
-
-        DeferredResult<ResponseEntity<Object>> deferredResult = new DeferredResult<>(30 * 60 * 1000L); // 30 minutos
-        CompletableFuture<VideoResizeResponseDTO> future = videoResizeService.resizeVideo(videoResizeRequest);
-
-        future.thenAccept(responseDTO -> deferredResult.setResult(ResponseEntity.ok(responseDTO))).exceptionally(ex -> {
-            String errorMessage;
-
-            if (ex.getCause() != null) {
-                errorMessage = Objects.toString(ex.getCause().getMessage(), "Erro desconhecido ao processar o vídeo.");
-            } else {
-                errorMessage = Objects.toString(ex.getMessage(), "Erro desconhecido ao processar o vídeo.");
-            }
-
-            logger.error("Erro ao processar o vídeo: {}", errorMessage, ex);
-
-            deferredResult.setResult(ResponseEntity.badRequest().body(Map.of("message", errorMessage)));
-            return null;
-        });
-
-        return deferredResult;
-    }
-
-    @PostMapping("/edit/overlay-text")
-    public ResponseEntity<?> overlayTextOnVideo(@RequestBody @Valid VideoOverlayRequest overlayRequest) {
         try {
-            VideoOverlayResponseDTO responseDTO = videoOverlayService.createOverlay(overlayRequest);
-            return ResponseEntity.ok(responseDTO);
-        } catch (EntityNotFoundException e) {
-            logger.error("Erro: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message", e.getMessage()));
-        } catch (IllegalArgumentException e) {
-            logger.error("Erro de validação: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (Exception e) {
-            logger.error("Erro inesperado: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("message", "Ocorreu um erro inesperado ao aplicar a sobreposição de texto."));
+            VideoResizeResponseDTO response = videoResizeService.resizeVideo(videoResizeRequest);
+            return ResponseEntity.ok(response);
+        } catch (IOException | InterruptedException e) {
+            return ResponseEntity.internalServerError()
+                    .body(new VideoResizeResponseDTO("", "Erro ao processar o vídeo.", ZonedDateTime.now()));
         }
     }
 
+    /*
+     * @PostMapping("/edit/overlay-text")
+     * public ResponseEntity<?> overlayTextOnVideo(@RequestBody @Valid
+     * VideoOverlayRequest overlayRequest) {
+     * try {
+     * VideoOverlayResponseDTO responseDTO =
+     * videoOverlayService.createOverlay(overlayRequest);
+     * return ResponseEntity.ok(responseDTO);
+     * } catch (EntityNotFoundException e) {
+     * logger.error("Erro: {}", e.getMessage());
+     * return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("message",
+     * e.getMessage()));
+     * } catch (IllegalArgumentException e) {
+     * logger.error("Erro de validação: {}", e.getMessage());
+     * return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+     * } catch (Exception e) {
+     * logger.error("Erro inesperado: {}", e.getMessage());
+     * return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+     * .body(Map.of("message",
+     * "Ocorreu um erro inesperado ao aplicar a sobreposição de texto."));
+     * }
+     * }
+     */
+
     @PostMapping("/convert")
-    public CompletableFuture<ResponseEntity<VideoConversionsDTO>> convertVideo(
-            @Valid @RequestBody VideoConversionRequest request) {
-
-        logger.info("Recebida solicitação de conversão para o vídeo ID: {}", request.getVideoId());
-
-        return videoConversionService.convertVideo(request)
-                .thenApplyAsync(dto -> {
-                    logger.info("Conversão concluída com sucesso para o vídeo ID: {}", request.getVideoId());
-                    return ResponseEntity.ok(dto);
-                })
-                .exceptionally(ex -> {
-                    Throwable cause = ex.getCause();
-                    logger.error("Erro ao processar a conversão para o vídeo ID: {} - {}", request.getVideoId(),
-                            cause.getMessage());
-
-                    if (cause instanceof IllegalArgumentException) {
-                        return ResponseEntity.status(400).body(null);
-                    }
-                    return ResponseEntity.status(500).body(null);
-                });
+    public ResponseEntity<VideoConversionsDTO> convertVideo(@RequestBody @Valid VideoConversionRequest request) {
+        try {
+            VideoConversionsDTO response = videoConversionService.convertVideo(request);
+            return ResponseEntity.ok(response);
+        } catch (IOException | InterruptedException e) {
+            return ResponseEntity.internalServerError()
+                    .body(new VideoConversionsDTO("", "", "", ZonedDateTime.now()));
+        }
     }
 
     @PostMapping("/batch-process")
-    public ResponseEntity<String> processBatch(@Valid @RequestBody BatchProcessingRequest batchRequest) {
-        logger.info("Recebida solicitação para processamento em lote de vídeos. IDs: {}", batchRequest.getVideoIds());
-
+    public ResponseEntity<?> processBatch(@RequestBody @Valid VideoBatchRequest batchRequest) {
         try {
-            batchProcessingService.processBatch(batchRequest);
-            return ResponseEntity.ok("Processamento em lote iniciado com sucesso.");
-        } catch (IOException | InterruptedException e) {
-            logger.error("Erro ao processar vídeos em lote: {}", e.getMessage());
-            return ResponseEntity.internalServerError().body("Erro ao processar vídeos em lote.");
+            VideoBatchResponseDTO response = videoBatchService.processBatch(batchRequest);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Erro ao processar lote: " + e.getMessage());
         }
     }
 

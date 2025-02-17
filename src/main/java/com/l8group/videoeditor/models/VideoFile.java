@@ -35,9 +35,9 @@ public class VideoFile {
     private VideoStatus status;
 
     @Column(name = "duration", nullable = false)
-    private Long duration;
+    private String duration;
 
-    @Column(name = "file_path")
+    @Transient // 🔹 Agora não será salvo no banco
     private String filePath;
 
     public UUID getId() {
@@ -96,11 +96,11 @@ public class VideoFile {
         this.status = status;
     }
 
-    public Long getDuration() {
+    public String getDuration() {
         return duration;
     }
 
-    public void setDuration(Long duration) {
+    public void setDuration(String duration) {
         this.duration = duration;
     }
 

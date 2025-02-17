@@ -1,4 +1,4 @@
-package com.l8group.videoeditor.services;
+/*package com.l8group.videoeditor.services;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -30,7 +30,7 @@ public class VideoOverlayService {
     private static final Logger logger = LoggerFactory.getLogger(VideoOverlayService.class);
     private final VideoOverlayRepository videoOverlayRepository;
     private final VideoFileRepository videoFileRepository;
-    private final String outputSubdirectory = "videos-with-overlay";
+    private final String outputSubdirectory = "processed-videos";
 
     public VideoOverlayService(VideoOverlayRepository videoOverlayRepository, VideoFileRepository videoFileRepository) {
         this.videoOverlayRepository = videoOverlayRepository;
@@ -204,3 +204,4 @@ public class VideoOverlayService {
     }
 
 }
+*/
