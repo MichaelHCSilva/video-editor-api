@@ -3,12 +3,21 @@ package com.l8group.videoeditor.services;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,6 +35,9 @@ public class VideoFileService {
 
     private final VideoFileRepository videoFileRepository;
     private static final String UPLOAD_DIR = "videos";
+
+        private static final Logger log = LoggerFactory.getLogger(VideoFileService.class);
+
 
     public VideoFileService(VideoFileRepository videoFileRepository) {
         this.videoFileRepository = videoFileRepository;
@@ -81,6 +93,52 @@ public class VideoFileService {
                     return videoFile;
                 })
                 .orElseThrow(() -> new VideoProcessingException("Vídeo não encontrado no banco de dados."));
+    }
+
+    public ResponseEntity<Resource> downloadProcessedVideo(UUID videoId) {
+        try {
+            log.info("Buscando vídeo no banco - ID: {}", videoId);
+
+            VideoFile videoFile = getVideoById(videoId);
+
+            String baseFilePath = videoFile.getFilePath();
+            String baseFileName = baseFilePath.substring(0, baseFilePath.lastIndexOf('.'));
+            String originalExtension = baseFilePath.substring(baseFilePath.lastIndexOf('.') + 1);
+
+            Path videoPath = Paths.get(baseFilePath);
+            List<String> formats = List.of(originalExtension, "mp4", "avi", "mov");
+
+            for (String format : formats) {
+                Path alternativePath = Paths.get(baseFileName + "." + format);
+                if (Files.exists(alternativePath)) {
+                    videoPath = alternativePath;
+                    log.info("Arquivo encontrado: {}", videoPath);
+                    break;
+                }
+            }
+
+            if (!Files.exists(videoPath)) {
+                log.error("Nenhum arquivo encontrado para o vídeo ID: {}", videoId);
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+            }
+
+            Resource resource = new UrlResource(videoPath.toUri());
+
+            if (!resource.exists() || !resource.isReadable()) {
+                log.error("Arquivo encontrado, mas não pode ser lido: {}", videoPath);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+
+            log.info("Arquivo pronto para download: {}", resource.getFilename());
+
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                    .body(resource);
+
+        } catch (Exception e) {
+            log.error("🔥 Erro ao tentar baixar o vídeo: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 
     private void validateFile(MultipartFile file) {

@@ -33,22 +33,17 @@ public class VideoResizeService {
 
     
     public VideoResizeResponseDTO resizeVideo(VideoResizeRequest request) throws IOException, InterruptedException {
-        // Buscar o vídeo original no banco de dados
         VideoFile originalVideo = videoFileService.getVideoById(UUID.fromString(request.getVideoId()));
 
 
         String inputFilePath = originalVideo.getFilePath();
         
-        // Criar um arquivo temporário para armazenar o vídeo redimensionado
         String tempFilePath = inputFilePath + "_temp.mp4";
 
-        // Executar o redimensionamento
         resize(inputFilePath, tempFilePath, request.getWidth(), request.getHeight());
 
-        // Substituir o arquivo original pelo redimensionado
         replaceOriginalFile(inputFilePath, tempFilePath);
 
-        // Salvar no banco de dados o redimensionamento
         VideoResize videoResize = saveVideoResize(originalVideo, originalVideo.getFileName(), request.getWidth(), request.getHeight());
 
         return new VideoResizeResponseDTO(originalVideo.getFileName(), request.getWidth() + "x" + request.getHeight(), videoResize.getCreatedAt());
@@ -59,7 +54,6 @@ public class VideoResizeService {
             throw new VideoProcessingException("Resolução não suportada.");
         }
     
-        // Se entrada e saída forem o mesmo arquivo, criar um temporário
         boolean sameFile = inputFilePath.equals(outputFilePath);
         String tempFilePath = sameFile ? inputFilePath + "_temp.mp4" : outputFilePath;
     

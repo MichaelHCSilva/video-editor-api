@@ -21,6 +21,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/videos/edit/overlay-text").permitAll()
                 .requestMatchers("/api/videos/batch-process").permitAll()
                 .requestMatchers("/api/videos/convert").permitAll()
+                .requestMatchers("/api/videos/download/{videoId}").permitAll()
                 .requestMatchers("/error").permitAll() 
                 .anyRequest().authenticated()  
             );

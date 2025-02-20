@@ -16,6 +16,7 @@ import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.models.VideoBatchProcess;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoBatchProcessRepository;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoBatchRequest;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.requests.VideoCutRequest;
@@ -26,17 +27,20 @@ public class VideoBatchService {
 
     private final VideoFileService videoFileService;
     private final VideoBatchProcessRepository videoBatchProcessRepository;
+    private final VideoFileRepository videoFileRepository;
     private final VideoCutService videoCutService;
     private final VideoResizeService videoResizeService;
     private final VideoConversionService videoConversionService;
 
     public VideoBatchService(VideoFileService videoFileService,
             VideoBatchProcessRepository videoBatchProcessRepository,
+            VideoFileRepository videoFileRepository,
             VideoCutService videoCutService,
             VideoResizeService videoResizeService,
             VideoConversionService videoConversionService) {
         this.videoFileService = videoFileService;
         this.videoBatchProcessRepository = videoBatchProcessRepository;
+        this.videoFileRepository = videoFileRepository;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
         this.videoConversionService = videoConversionService;
@@ -46,7 +50,7 @@ public class VideoBatchService {
     public VideoBatchResponseDTO processBatch(VideoBatchRequest request) {
         List<VideoFile> videoFiles = request.getVideoIds().stream()
                 .map(UUID::fromString)
-                .map(videoFileService::getVideoById) // Agora usa o serviço em vez do repositório
+                .map(videoFileService::getVideoById)
                 .collect(Collectors.toList());
 
         if (videoFiles.isEmpty()) {
@@ -111,9 +115,9 @@ public class VideoBatchService {
                 }
             }
 
-            // Recarrega o vídeo para garantir que a entidade esteja atualizada antes de
-            // salvar
-            videoFile = videoFileService.getVideoById(videoFile.getId());
+            // Atualiza o caminho do vídeo no banco de dados
+            videoFile.setFilePath(inputFilePath);
+            videoFileRepository.save(videoFile);
 
             VideoBatchProcess batchProcess = new VideoBatchProcess();
             batchProcess.setVideoFile(videoFile);
@@ -121,7 +125,6 @@ public class VideoBatchService {
             batchProcess.setCreatedAt(ZonedDateTime.now());
             batchProcess.setUpdatedAt(ZonedDateTime.now());
 
-            // Converte lista de operações para uma única string separada por vírgulas
             String operationsString = request.getOperations().stream()
                     .map(VideoBatchRequest.BatchOperation::getOperationType)
                     .collect(Collectors.joining(" - "));
@@ -130,7 +133,6 @@ public class VideoBatchService {
 
             videoBatchProcessRepository.saveAndFlush(batchProcess);
 
-            // Extrai apenas o nome do arquivo para o DTO
             String fileName = Paths.get(inputFilePath).getFileName().toString();
 
             return new VideoBatchResponseDTO(

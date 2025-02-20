@@ -31,32 +31,24 @@ public class VideoCutService {
     }
 
     public VideoCutResponseDTO cutVideo(VideoCutRequest request) throws IOException, InterruptedException {
-        // Buscar o vídeo original
         VideoFile originalVideo = videoFileService.getVideoById(UUID.fromString(request.getVideoId()));
 
         String inputFilePath = originalVideo.getFilePath();
         Duration originalDuration = VideoDurationUtils.getVideoDuration(inputFilePath);
 
-        // Validar tempos de corte
         validateCutTimes(request.getStartTime(), request.getEndTime(), originalDuration);
 
-        // Criar arquivo temporário para o corte
         String tempFilePath = inputFilePath + "_temp.mp4";
 
-        // Executar o corte do vídeo
         executeCutCommand(inputFilePath, request.getStartTime(), request.getEndTime(), tempFilePath);
 
-        // Verificar se o arquivo foi criado corretamente
         verifyCutFileExistence(tempFilePath);
 
-        // Substituir o arquivo original pelo cortado
         replaceOriginalFile(inputFilePath, tempFilePath);
 
-        // Salvar no banco de dados
         Duration cutDuration = request.getEndTime().minus(request.getStartTime());
         VideoCut videoCut = saveVideoCut(originalVideo, originalVideo.getFileName(), cutDuration);
 
-        // Retornar resposta com os detalhes do corte
         return new VideoCutResponseDTO(originalVideo.getFileName(), VideoDurationUtils.formatDuration(cutDuration),
                 videoCut.getCreatedAt());
     }

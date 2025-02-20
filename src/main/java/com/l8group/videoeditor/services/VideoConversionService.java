@@ -30,7 +30,6 @@ public class VideoConversionService {
     }
 
     public VideoConversionsDTO convertVideo(VideoConversionRequest request) throws IOException, InterruptedException {
-        // Buscar vídeo original no banco
         VideoFile originalVideo = videoFileService.getVideoById(UUID.fromString(request.getVideoId()));
 
 
@@ -41,25 +40,18 @@ public class VideoConversionService {
             throw new VideoProcessingException("Formato de conversão inválido.");
         }
 
-        // Novo caminho para o arquivo com a nova extensão
         String newFilePath = inputFilePath.replaceFirst("\\.[^.]+$", "") + "." + targetFormat;
 
-        // Criar um arquivo temporário para armazenar o vídeo convertido
         String tempFilePath = inputFilePath + "_temp." + targetFormat;
 
-        // Executar conversão do vídeo
         executeConversionCommand(inputFilePath, tempFilePath, targetFormat);
 
-        // Verificar se o arquivo foi criado corretamente
         verifyConvertedFileExistence(tempFilePath);
 
-        // Substituir o arquivo original pelo convertido e atualizar no banco de dados
         replaceOriginalFile(inputFilePath, tempFilePath, newFilePath, originalVideo);
 
-        // Salvar conversão no banco
         VideoConversion videoConversion = saveVideoConversion(originalVideo, targetFormat);
 
-        // Retornar resposta para o usuário
         return new VideoConversionsDTO(originalVideo.getFileName(), newFilePath, targetFormat,
                 videoConversion.getCreatedAt());
     }
@@ -70,16 +62,12 @@ public class VideoConversionService {
             throw new IllegalArgumentException("Parâmetros inválidos para conversão.");
         }
 
-        // Criar um arquivo temporário para armazenar o vídeo convertido
         String tempFilePath = outputFilePath + "_temp." + format;
 
-        // Executar conversão do vídeo
         executeConversionCommand(inputFilePath, tempFilePath, format);
 
-        // Verificar se o arquivo foi criado corretamente
         verifyConvertedFileExistence(tempFilePath);
 
-        // Substituir o arquivo original pelo convertido
         Files.move(new File(tempFilePath).toPath(), new File(outputFilePath).toPath(),
                 StandardCopyOption.REPLACE_EXISTING);
     }
@@ -87,7 +75,6 @@ public class VideoConversionService {
     private void executeConversionCommand(String inputFilePath, String outputFilePath, String format)
             throws IOException, InterruptedException {
 
-        // Garantir que a saída tenha a extensão correta
         if (!outputFilePath.endsWith("." + format)) {
             outputFilePath += "." + format;
         }
@@ -113,13 +100,10 @@ public class VideoConversionService {
             throw new IOException("Erro ao substituir o arquivo original após a conversão.");
         }
 
-        // Remover o arquivo original
         Files.deleteIfExists(new File(originalFilePath).toPath());
 
-        // Renomear o arquivo temporário para o novo nome
         Files.move(tempFile.toPath(), new File(newFilePath).toPath(), StandardCopyOption.REPLACE_EXISTING);
 
-        // Atualizar caminho e formato no banco de dados
         originalVideo.setFilePath(newFilePath);
         
         videoFileService.updateVideoFile(originalVideo);

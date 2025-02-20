@@ -1,11 +1,16 @@
 package com.l8group.videoeditor.controllers;
 
 import java.io.IOException;
+
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.UUID;
+
+import org.springframework.core.io.Resource;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,10 +44,11 @@ public class VideoFileController {
     // private static final Logger logger =
     // LoggerFactory.getLogger(VideoFileController.class);
 
+
     private final VideoFileService videoFileService;
     private final VideoCutService videoCutService;
     private final VideoResizeService videoResizeService;
-    //private final VideoFileRepository videoFileRepository;
+    // private final VideoFileRepository videoFileRepository;
 
     private final VideoConversionService videoConversionService;
     private final VideoBatchService videoBatchService;
@@ -54,7 +60,7 @@ public class VideoFileController {
         this.videoFileService = videoFileService;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
-        
+
         this.videoConversionService = videoConversionService;
         this.videoBatchService = videoBatchService;
     }
@@ -137,6 +143,11 @@ public class VideoFileController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Erro ao processar lote: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/download/{videoId}")
+    public ResponseEntity<Resource> downloadProcessedVideo(@PathVariable UUID videoId) {
+        return videoFileService.downloadProcessedVideo(videoId);
     }
 
 }
