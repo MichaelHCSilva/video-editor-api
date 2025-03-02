@@ -25,8 +25,8 @@ public class VideoCut {
     @Column(name = "duration", nullable = false)
     private String duration; 
 
-    @Column(name = "uploaded_at", nullable = false)
-    private ZonedDateTime uploadedAt;
+    @Column(name = "updated_at", nullable = false)
+    private ZonedDateTime updatedAt;
 
     @Column(name = "created_at", nullable = false)
     private ZonedDateTime createdAt;
@@ -59,20 +59,20 @@ public class VideoCut {
         this.fileName = fileName;
     }
 
-    public String getDuration() {  // Agora retorna uma String formatada
+    public String getDuration() {  
         return duration;
     }
 
-    public void setDuration(String duration) {  // Agora recebe uma String
+    public void setDuration(String duration) {  
         this.duration = duration;
     }
 
-    public ZonedDateTime getUploadedAt() {
-        return uploadedAt;
+    public ZonedDateTime getUpdatedAt() {
+        return updatedAt;
     }
 
-    public void setUploadedAt(ZonedDateTime uploadedAt) {
-        this.uploadedAt = uploadedAt;
+    public void setUpdatedAt(ZonedDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     public ZonedDateTime getCreatedAt() {

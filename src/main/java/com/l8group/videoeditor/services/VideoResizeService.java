@@ -111,7 +111,7 @@ public class VideoResizeService {
         videoResize.setFileName(fileName);
         videoResize.setResolution(width + "x" + height);
         videoResize.setCreatedAt(ZonedDateTime.now());
-        videoResize.setUploadedAt(ZonedDateTime.now());
+        videoResize.setUpdatedAt(ZonedDateTime.now());
         videoResize.setStatus(VideoStatus.PROCESSING);
         return videoResizeRepository.save(videoResize);
     }

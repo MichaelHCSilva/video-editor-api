@@ -26,6 +26,7 @@ import com.l8group.videoeditor.dtos.VideoUploadResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatus;
 import com.l8group.videoeditor.exceptions.VideoProcessingException;
 import com.l8group.videoeditor.models.VideoFile;
+import com.l8group.videoeditor.rabbitmq.producer.VideoProcessingProducer;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoFileRequest;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
@@ -34,13 +35,15 @@ import com.l8group.videoeditor.utils.VideoDurationUtils;
 public class VideoFileService {
 
     private final VideoFileRepository videoFileRepository;
+    private final VideoProcessingProducer videoProcessingProducer;
     private static final String UPLOAD_DIR = "videos";
 
         private static final Logger log = LoggerFactory.getLogger(VideoFileService.class);
 
 
-    public VideoFileService(VideoFileRepository videoFileRepository) {
+    public VideoFileService(VideoFileRepository videoFileRepository, VideoProcessingProducer videoProcessingProducer) {
         this.videoFileRepository = videoFileRepository;
+        this.videoProcessingProducer = videoProcessingProducer;
 
     }
 
@@ -69,6 +72,9 @@ public class VideoFileService {
         videoFile.setFilePath(filePath);
 
         System.out.println("Vídeo salvo com formato: " + fileFormat);
+
+        videoProcessingProducer.sendVideoForProcessing(videoFile);
+        log.info("📤 Vídeo enviado para processamento no RabbitMQ: {}", videoFile.getId());
 
         return new VideoUploadResponseDTO(videoFile.getId(), "Upload realizado com sucesso!");
     }
@@ -189,7 +195,7 @@ public class VideoFileService {
         videoFile.setFileName(fileName);
         videoFile.setFileSize(file.getSize());
         videoFile.setFileFormat(fileFormat);
-        videoFile.setUploadedAt(ZonedDateTime.now());
+        videoFile.setUpdatedAt(ZonedDateTime.now());
         videoFile.setCreatedAt(ZonedDateTime.now());
         videoFile.setDuration(formattedDuration);
         videoFile.setStatus(VideoStatus.PROCESSING);

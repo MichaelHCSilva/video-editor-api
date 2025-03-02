@@ -29,8 +29,8 @@ public class VideoResize {
     @Column(name = "created_at", nullable = false)
     private ZonedDateTime createdAt;
 
-    @Column(name = "uploaded_at", nullable = false)
-    private ZonedDateTime uploadedAt;
+    @Column(name = "updated_at", nullable = false)
+    private ZonedDateTime updatedAt;
 
     @Column(name = "resolution", nullable = false)
     private String resolution;
@@ -75,12 +75,12 @@ public class VideoResize {
         this.createdAt = createdAt;
     }
 
-    public ZonedDateTime getUploadedAt() {
-        return uploadedAt;
+    public ZonedDateTime getUpdatedAt() {
+        return updatedAt;
     }
 
-    public void setUploadedAt(ZonedDateTime uploadedAt) {
-        this.uploadedAt = uploadedAt;
+    public void setUpdatedAt(ZonedDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     public String getResolution() {

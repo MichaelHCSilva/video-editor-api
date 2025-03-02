@@ -27,8 +27,8 @@ public class VideoFile {
     @Column(name = "created_at", nullable = false)
     private ZonedDateTime createdAt;
 
-    @Column(name = "uploaded_at", nullable = false)
-    private ZonedDateTime uploadedAt;
+    @Column(name = "updated_at", nullable = false)
+    private ZonedDateTime updatedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -80,12 +80,12 @@ public class VideoFile {
         this.createdAt = createdAt;
     }
 
-    public ZonedDateTime getUploadedAt() {
-        return uploadedAt;
+    public ZonedDateTime getUpdatedAt() {
+        return updatedAt;
     }
 
-    public void setUploadedAt(ZonedDateTime uploadedAt) {
-        this.uploadedAt = uploadedAt;
+    public void setUpdatedAt(ZonedDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     public VideoStatus getStatus() {
@@ -111,5 +111,7 @@ public class VideoFile {
     public void setFilePath(String filePath) {
         this.filePath = filePath;
     }
+
+    
 
 }

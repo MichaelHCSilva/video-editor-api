@@ -120,7 +120,7 @@ public class VideoCutService {
         videoCut.setFileName(fileName);
         videoCut.setDuration(formatDuration(cutDuration));
         videoCut.setCreatedAt(ZonedDateTime.now());
-        videoCut.setUploadedAt(ZonedDateTime.now());
+        videoCut.setUpdatedAt(ZonedDateTime.now());
         videoCut.setStatus(VideoStatus.PROCESSING);
         return videoCutRepository.save(videoCut);
     }
