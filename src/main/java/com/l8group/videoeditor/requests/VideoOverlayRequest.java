@@ -14,13 +14,13 @@ public class VideoOverlayRequest {
 
     @NotBlank(message = "Os dados de sobreposição são obrigatórios.")
     @Size(max = 255, message = "Os dados de sobreposição devem ter no máximo 255 caracteres.")
-    private String overlayData;
+    private String watermark;
 
     @NotNull(message = "A posição é obrigatória.")
     private OverlayPosition position;
 
     @Min(value = 1, message = "O tamanho da fonte deve ser maior que 0.")
-    private Integer fontSize; 
+    private Integer fontSize;
 
     public String getVideoId() {
         return videoId;
@@ -30,12 +30,12 @@ public class VideoOverlayRequest {
         this.videoId = videoId;
     }
 
-    public String getOverlayData() {
-        return overlayData;
+    public String getWatermark() {
+        return watermark;
     }
 
-    public void setOverlayData(String overlayData) {
-        this.overlayData = overlayData;
+    public void setWatermark(String watermark) {
+        this.watermark = watermark;
     }
 
     public OverlayPosition getPosition() {
@@ -53,4 +53,5 @@ public class VideoOverlayRequest {
     public void setFontSize(Integer fontSize) {
         this.fontSize = fontSize;
     }
+
 }

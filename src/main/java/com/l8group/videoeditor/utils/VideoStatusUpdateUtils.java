@@ -1,6 +1,8 @@
-package com.l8group.videoeditor.services;
+package com.l8group.videoeditor.utils;
 
 import com.l8group.videoeditor.enums.VideoStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,25 +13,29 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-public class StatusUpdateService {
+public class VideoStatusUpdateUtils {
+
+    private static final Logger logger = LoggerFactory.getLogger(VideoStatusUpdateUtils.class);
 
     @Transactional
     public <T> void updateStatus(JpaRepository<T, UUID> repository, UUID entityId, VideoStatus status) {
         Optional<T> entityOptional = repository.findById(entityId);
         if (entityOptional.isPresent()) {
             T entity = entityOptional.get();
-
             try {
                 updateStatusAndUpdatedAt(entity, status);
                 repository.save(entity);
-                System.out.println("✅ Status atualizado para " + status + " na entidade com ID: " + entityId);
+                logger.info("Status atualizado para {} na entidade com ID: {}", status, entityId);
+            } catch (NoSuchMethodException e) {
+                logger.error("Métodos setStatus ou setUpdatedAt não encontrados na entidade com ID: {}", entityId, e);
+                throw new RuntimeException("Métodos setStatus ou setUpdatedAt não encontrados na entidade.", e);
             } catch (Exception e) {
-                System.err.println("❌ Erro ao atualizar status na entidade com ID: " + entityId + ": " + e.getMessage());
-                throw new RuntimeException("❌ Erro ao atualizar status na entidade: " + e.getMessage(), e);
+                logger.error("Erro ao atualizar status na entidade com ID: {}", entityId, e);
+                throw new RuntimeException("Erro ao atualizar status na entidade.", e);
             }
         } else {
-            System.err.println("⚠️ Nenhuma entidade encontrada com ID: " + entityId);
-            throw new RuntimeException("⚠️ Nenhuma entidade encontrada com ID: " + entityId);
+            logger.warn("Nenhuma entidade encontrada com ID: {}", entityId);
+            throw new RuntimeException("Nenhuma entidade encontrada com ID: " + entityId);
         }
     }
 

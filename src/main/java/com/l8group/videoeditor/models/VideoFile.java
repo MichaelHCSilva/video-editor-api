@@ -37,7 +37,7 @@ public class VideoFile {
     @Column(name = "duration", nullable = false)
     private String duration;
 
-    @Transient // 🔹 Agora não será salvo no banco
+    @Column(name = "filePath", nullable = false)
     private String filePath;
 
     public UUID getId() {

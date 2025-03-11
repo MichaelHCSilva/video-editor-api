@@ -19,9 +19,6 @@ public class VideoCut {
     @JoinColumn(name = "video_file_id", nullable = false)
     private VideoFile videoFile;
 
-    @Column(name = "file_name", nullable = false)
-    private String fileName;
-
     @Column(name = "duration", nullable = false)
     private String duration; 
 
@@ -49,14 +46,6 @@ public class VideoCut {
 
     public void setVideoFile(VideoFile videoFile) {
         this.videoFile = videoFile;
-    }
-
-    public String getFileName() {
-        return fileName;
-    }
-
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
     }
 
     public String getDuration() {  

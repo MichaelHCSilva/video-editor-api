@@ -3,129 +3,141 @@ package com.l8group.videoeditor.services;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDate;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import com.l8group.videoeditor.dtos.VideoConversionsDTO;
 import com.l8group.videoeditor.enums.VideoStatus;
-import com.l8group.videoeditor.exceptions.VideoProcessingException;
 import com.l8group.videoeditor.models.VideoConversion;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoConversionRepository;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
+import com.l8group.videoeditor.utils.VideoProcessorUtils;
+import com.l8group.videoeditor.utils.VideoUtils;
 
 @Service
 public class VideoConversionService {
 
+    private final VideoFileRepository videoFileRepository;
     private final VideoConversionRepository videoConversionRepository;
-    private final VideoFileService videoFileService;
+    private static final Logger logger = LoggerFactory.getLogger(VideoConversionService.class);
 
-    public VideoConversionService(VideoFileService videoFileService,
-            VideoConversionRepository videoConversionRepository) {
-        this.videoFileService = videoFileService;
+    @Value("${video.temp.dir}")
+    private String TEMP_DIR;
+
+    public VideoConversionService(VideoFileRepository videoFileRepository, VideoConversionRepository videoConversionRepository) {
+        this.videoFileRepository = videoFileRepository;
         this.videoConversionRepository = videoConversionRepository;
     }
 
-    public VideoConversionsDTO convertVideo(VideoConversionRequest request) throws IOException, InterruptedException {
-        VideoFile originalVideo = videoFileService.getVideoById(UUID.fromString(request.getVideoId()));
+    @Transactional
+    public String convertVideo(VideoConversionRequest request, String previousFilePath) {
+        logger.info("Iniciando conversão de vídeo. videoId={}, outputFormat={}, previousFilePath={}",
+                request.getVideoId(), request.getOutputFormat(), previousFilePath);
 
+        UUID videoId = UUID.fromString(request.getVideoId());
+        String outputFormat = request.getOutputFormat();
 
-        String inputFilePath = originalVideo.getFilePath();
-        String targetFormat = request.getFormat();
+        // Busca o vídeo no banco
+        VideoFile videoFile = videoFileRepository.findById(videoId)
+                .orElseThrow(() -> {
+                    logger.error("Vídeo não encontrado para o ID: {}", videoId);
+                    return new RuntimeException("Vídeo não encontrado para o ID: " + videoId);
+                });
 
-        if (targetFormat == null || targetFormat.isEmpty()) {
-            throw new VideoProcessingException("Formato de conversão inválido.");
+        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getFileName(), videoFile.getFilePath());
+
+        // Determina o arquivo de entrada
+        String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
+                ? previousFilePath
+                : videoFile.getFilePath();
+
+        logger.info("Arquivo de entrada definido como: {}", inputFilePath);
+
+        // Verifica se o arquivo de entrada realmente existe
+        File inputFile = new File(inputFilePath);
+        if (!inputFile.exists()) {
+            logger.error("Arquivo de entrada não encontrado: {}", inputFilePath);
+            throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
-        String newFilePath = inputFilePath.replaceFirst("\\.[^.]+$", "") + "." + targetFormat;
+        String originalFileName = videoFile.getFileName();
+        String shortUUID = VideoUtils.generateShortUUID();
+        String formattedDate = VideoUtils.formatDate(LocalDate.now());
 
-        String tempFilePath = inputFilePath + "_temp." + targetFormat;
+        // Geração do nome do arquivo convertido
+        String baseFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')); // Nome sem extensão
+        String convertedFileName = baseFileName + "_" + shortUUID + formattedDate + "_convert." + outputFormat;
 
-        executeConversionCommand(inputFilePath, tempFilePath, targetFormat);
+        String outputFilePath = Paths.get(TEMP_DIR, convertedFileName).toString();
+        logger.info("Arquivo de saída definido como: {}", outputFilePath);
 
-        verifyConvertedFileExistence(tempFilePath);
+        // Garante que o diretório temporário existe
+        createTempDirectory();
 
-        replaceOriginalFile(inputFilePath, tempFilePath, newFilePath, originalVideo);
+        // Inicia o processo de conversão
+        logger.info("Iniciando conversão do vídeo: {} → {} (Formato: {})", inputFilePath, outputFilePath, outputFormat);
+        boolean success = VideoProcessorUtils.convertVideo(inputFilePath, outputFilePath, outputFormat);
 
-        VideoConversion videoConversion = saveVideoConversion(originalVideo, targetFormat);
+        if (!success) {
+            logger.error("Falha ao converter o vídeo para o formato {}", outputFormat);
+            throw new RuntimeException("Falha ao converter o vídeo para o formato " + outputFormat);
+        }
+        logger.info("Conversão concluída com sucesso.");
 
-        return new VideoConversionsDTO(originalVideo.getFileName(), newFilePath, targetFormat,
-                videoConversion.getCreatedAt());
+        // Salva as informações da conversão no banco de dados
+        VideoConversion videoConversion = createAndSaveVideoConversion(videoFile, outputFormat);
+        logger.info("Registro de conversão salvo no banco de dados. ID={}", videoConversion.getId());
+
+        return outputFilePath;
     }
 
-    public void convert(String inputFilePath, String outputFilePath, String format)
-            throws IOException, InterruptedException {
-        if (inputFilePath == null || outputFilePath == null || format == null || format.isEmpty()) {
-            throw new IllegalArgumentException("Parâmetros inválidos para conversão.");
-        }
-
-        String tempFilePath = outputFilePath + "_temp." + format;
-
-        executeConversionCommand(inputFilePath, tempFilePath, format);
-
-        verifyConvertedFileExistence(tempFilePath);
-
-        Files.move(new File(tempFilePath).toPath(), new File(outputFilePath).toPath(),
-                StandardCopyOption.REPLACE_EXISTING);
-    }
-
-    private void executeConversionCommand(String inputFilePath, String outputFilePath, String format)
-            throws IOException, InterruptedException {
-
-        if (!outputFilePath.endsWith("." + format)) {
-            outputFilePath += "." + format;
-        }
-
-        String[] command = {
-                "ffmpeg", "-y",
-                "-i", inputFilePath,
-                "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-                "-c:a", "aac", "-strict", "experimental",
-                outputFilePath
-        };
-
-        Process process = new ProcessBuilder(command).start();
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            throw new IOException("Erro ao converter o vídeo.");
-        }
-    }
-
-    private void replaceOriginalFile(String originalFilePath, String tempFilePath, String newFilePath, VideoFile originalVideo) throws IOException {
-        File tempFile = new File(tempFilePath);
-        if (!tempFile.exists() || tempFile.length() == 0) {
-            throw new IOException("Erro ao substituir o arquivo original após a conversão.");
-        }
-
-        Files.deleteIfExists(new File(originalFilePath).toPath());
-
-        Files.move(tempFile.toPath(), new File(newFilePath).toPath(), StandardCopyOption.REPLACE_EXISTING);
-
-        originalVideo.setFilePath(newFilePath);
-        
-        videoFileService.updateVideoFile(originalVideo);
-    }
-
-    private void verifyConvertedFileExistence(String filePath) throws IOException {
-        File file = new File(filePath);
-        if (!file.exists() || file.length() == 0) {
-            throw new IOException("Falha ao criar o arquivo de vídeo convertido.");
+    private void createTempDirectory() {
+        Path tempDirPath = Paths.get(TEMP_DIR);
+        if (!Files.exists(tempDirPath)) {
+            try {
+                Files.createDirectories(tempDirPath);
+                logger.info("Diretório temporário criado: {}", TEMP_DIR);
+            } catch (IOException e) {
+                logger.error("Erro ao criar diretório temporário: {}", e.getMessage());
+                throw new RuntimeException("Erro ao criar diretório temporário.", e);
+            }
         }
     }
 
-    private VideoConversion saveVideoConversion(VideoFile originalVideo, String targetFormat) {
+    private VideoConversion createAndSaveVideoConversion(VideoFile videoFile, String outputFormat) {
         VideoConversion videoConversion = new VideoConversion();
-        videoConversion.setVideoFile(originalVideo);
-        videoConversion.setFileName(originalVideo.getFileName());
-        videoConversion.setFileFormat(originalVideo.getFileFormat());
-        videoConversion.setTargetFormat(targetFormat);
+        videoConversion.setVideoFile(videoFile);
+        videoConversion.setOutputFormat(outputFormat);
+        videoConversion.setInputFormat(videoFile.getFileFormat());
         videoConversion.setCreatedAt(ZonedDateTime.now());
         videoConversion.setUpdatedAt(ZonedDateTime.now());
         videoConversion.setStatus(VideoStatus.PROCESSING);
 
         return videoConversionRepository.save(videoConversion);
+    }
+
+    // Remove arquivos temporários após a consolidação final
+    public void deleteTemporaryFiles(String filePath) {
+        File file = new File(filePath);
+        if (file.exists()) {
+            boolean deleted = file.delete();
+            if (deleted) {
+                logger.info("Arquivo temporário removido com sucesso: {}", filePath);
+            } else {
+                logger.error("Falha ao excluir arquivo temporário: {}", filePath);
+            }
+        } else {
+            logger.warn("Tentativa de remover arquivo inexistente: {}", filePath);
+        }
     }
 }

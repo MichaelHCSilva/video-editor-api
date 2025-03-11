@@ -4,40 +4,30 @@ import java.time.ZonedDateTime;
 
 public class VideoConversionsDTO {
 
-    private String fileName;
-    private String fileFormat;
-    private String targetFormat;
+    private String inputFormat;
+    private String outputFormat;
     private ZonedDateTime createdAt;
 
-    public VideoConversionsDTO(String fileName, String fileFormat, String targetFormat, ZonedDateTime createdAt){
-        this.fileName = fileName; 
-        this.fileFormat = fileFormat;
-        this.targetFormat = targetFormat;
+    public VideoConversionsDTO(String inputFormat, String outputFormat, ZonedDateTime createdAt) {
+        this.inputFormat = inputFormat;
+        this.outputFormat = outputFormat;
         this.createdAt = createdAt;
     }
 
-    public String getFileName() {
-        return fileName;
+    public String getInputFormat() {
+        return inputFormat;
     }
 
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
+    public void setInputFormat(String inputFormat) {
+        this.inputFormat = inputFormat;
     }
 
-    public String getFileFormat() {
-        return fileFormat;
+    public String getOutputFormat() {
+        return outputFormat;
     }
 
-    public void setFileFormat(String fileFormat) {
-        this.fileFormat = fileFormat;
-    }
-
-    public String getTargetFormat() {
-        return targetFormat;
-    }
-
-    public void setTargetFormat(String targetFormat) {
-        this.targetFormat = targetFormat;
+    public void setOutputFormat(String outputFormat) {
+        this.outputFormat = outputFormat;
     }
 
     public ZonedDateTime getCreatedAt() {
@@ -47,8 +37,4 @@ public class VideoConversionsDTO {
     public void setCreatedAt(ZonedDateTime createdAt) {
         this.createdAt = createdAt;
     }
-
-    
-   
-
 }

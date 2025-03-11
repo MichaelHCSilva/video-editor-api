@@ -5,12 +5,12 @@ import jakarta.validation.constraints.Pattern;
 
 public class VideoConversionRequest {
 
-    @NotBlank(message = "O ID do vídeo é obrigatorio.")
+    @NotBlank(message = "O ID do vídeo é obrigatório.")
     private String videoId;
 
-    @NotBlank(message = "O formato do vídeo é obrigatorio")
-    @Pattern(regexp = "^(mp4|avi|mov)$", message = "Formato inválido. Formatos suportados: mp4, avi, mov.")
-    private String format;
+    @NotBlank(message = "O formato de saída é obrigatório.")
+    @Pattern(regexp = "^(mp4|avi|mov)$", message = "Formato de saída inválido. Formatos suportados: mp4, avi, mov.")
+    private String outputFormat;
 
     public String getVideoId() {
         return videoId;
@@ -20,13 +20,11 @@ public class VideoConversionRequest {
         this.videoId = videoId;
     }
 
-    public String getFormat() {
-        return format;
+    public String getOutputFormat() {
+        return outputFormat;
     }
 
-    public void setFormat(String format) {
-        this.format = format;
+    public void setOutputFormat(String outputFormat) {
+        this.outputFormat = outputFormat;
     }
-
-
 }

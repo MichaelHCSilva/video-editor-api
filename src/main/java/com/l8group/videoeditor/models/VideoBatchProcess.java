@@ -26,10 +26,13 @@ public class VideoBatchProcess {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
-     
+
     @ManyToOne
     @JoinColumn(name = "video_file_id", nullable = false)
     private VideoFile videoFile;
+
+    @Column(nullable = false)
+    private String processedFileName;
 
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
@@ -59,6 +62,14 @@ public class VideoBatchProcess {
 
     public void setVideoFile(VideoFile videoFile) {
         this.videoFile = videoFile;
+    }
+
+    public String getProcessedFileName() {
+        return processedFileName;
+    }
+
+    public void setProcessedFileName(String processedFileName) {
+        this.processedFileName = processedFileName;
     }
 
     public VideoStatus getStatus() {

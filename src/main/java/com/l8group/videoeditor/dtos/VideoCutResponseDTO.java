@@ -4,22 +4,14 @@ import java.time.ZonedDateTime;
 
 public class VideoCutResponseDTO {
 
-    private String fileName;
+    
     private String duration;
     private ZonedDateTime createdAt;
 
-    public VideoCutResponseDTO(String fileName, String duration, ZonedDateTime createdAt) {
-        this.fileName = fileName;
+    public VideoCutResponseDTO( String duration, ZonedDateTime createdAt) {
+        
         this.duration = duration;
         this.createdAt = createdAt;
-    }
-
-    public String getFileName() {
-        return fileName;
-    }
-
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
     }
 
     public String getDuration() {

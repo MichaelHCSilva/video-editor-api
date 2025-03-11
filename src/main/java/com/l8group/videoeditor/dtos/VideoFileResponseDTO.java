@@ -1,19 +1,24 @@
 package com.l8group.videoeditor.dtos;
 
+//import com.l8group.videoeditor.enums.VideoStatus;
 import java.time.ZonedDateTime;
-
-import com.l8group.videoeditor.enums.VideoStatus;
+import java.util.UUID;
 
 public class VideoFileResponseDTO {
+    private UUID id; 
+    private String fileName;
+    private ZonedDateTime createdAt;
+    
 
-    private final String fileName;
-    private final ZonedDateTime createdAt;
-    private final VideoStatus status;
-
-    public VideoFileResponseDTO(String fileName, ZonedDateTime createdAt, VideoStatus status) {
+    public VideoFileResponseDTO(UUID id, String fileName, ZonedDateTime createdAt) {
+        this.id = id;
         this.fileName = fileName;
         this.createdAt = createdAt;
-        this.status = status;
+        
+    }
+
+    public UUID getId() {
+        return id;
     }
 
     public String getFileName() {
@@ -24,7 +29,4 @@ public class VideoFileResponseDTO {
         return createdAt;
     }
 
-    public VideoStatus getStatus() {
-        return status;
-    }
 }

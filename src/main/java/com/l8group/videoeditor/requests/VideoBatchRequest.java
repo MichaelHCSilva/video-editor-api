@@ -4,6 +4,8 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
+import com.l8group.videoeditor.enums.OverlayPosition;
+
 public class VideoBatchRequest {
 
     @NotEmpty(message = "A lista de vídeos não pode estar vazia.")
@@ -57,8 +59,12 @@ public class VideoBatchRequest {
         private String endTime; // Para CUT
         private Integer width; // Para RESIZE
         private Integer height; // Para RESIZE
-        private String format; // Para CONVERT
+        private String outputFormat; // Para CONVERT
+        private String watermark; // Para OVERLAY
+        private OverlayPosition position; // Para OVERLAY
+        private Integer fontSize; // Para OVERLAY
 
+        // Getters e setters para todos os campos
         public String getStartTime() {
             return startTime;
         }
@@ -91,12 +97,38 @@ public class VideoBatchRequest {
             this.height = height;
         }
 
-        public String getFormat() {
-            return format;
+        public String getOutputFormat() {
+            return outputFormat;
         }
 
-        public void setFormat(String format) {
-            this.format = format;
+        public void setOutputFormat(String outputFormat) {
+            this.outputFormat = outputFormat;
         }
+
+        public String getWatermark() {
+            return watermark;
+        }
+
+        public void setWatermark(String watermark) {
+            this.watermark = watermark;
+        }
+
+        public OverlayPosition getPosition() {
+            return position;
+        }
+
+        public void setPosition(OverlayPosition position) {
+            this.position = position;
+        }
+
+        public Integer getFontSize() {
+            return fontSize;
+        }
+
+        public void setFontSize(Integer fontSize) {
+            this.fontSize = fontSize;
+        }
+
     }
+
 }

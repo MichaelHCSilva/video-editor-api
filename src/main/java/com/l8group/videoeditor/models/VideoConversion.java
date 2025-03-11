@@ -28,14 +28,11 @@ public class VideoConversion {
     @JoinColumn(name = "video_files_id", nullable = false)
     private VideoFile videoFile;
 
-    @Column(name = "file_name", nullable = false)
-    private String fileName;
+    @Column(name = "input_format", nullable = false)
+    private String inputFormat;
 
-    @Column(name = "file_format", nullable = false)
-    private String fileFormat;
-
-    @Column(name = "target_format", nullable = false)
-    private String targetFormat;
+    @Column(name = "output_format", nullable = false)
+    private String outputFormat;
 
     @Column(name = "created_at", nullable = false)
     private ZonedDateTime createdAt;
@@ -63,28 +60,20 @@ public class VideoConversion {
         this.videoFile = videoFile;
     }
 
-    public String getFileName() {
-        return fileName;
+    public String getInputFormat() {
+        return inputFormat;
     }
 
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
+    public void setInputFormat(String inputFormat) {
+        this.inputFormat = inputFormat;
     }
 
-    public String getFileFormat() {
-        return fileFormat;
+    public String getOutputFormat() {
+        return outputFormat;
     }
 
-    public void setFileFormat(String fileFormat) {
-        this.fileFormat = fileFormat;
-    }
-
-    public String getTargetFormat() {
-        return targetFormat;
-    }
-
-    public void setTargetFormat(String targetFormat) {
-        this.targetFormat = targetFormat;
+    public void setOutputFormat(String outputFormat) {
+        this.outputFormat = outputFormat;
     }
 
     public ZonedDateTime getCreatedAt() {

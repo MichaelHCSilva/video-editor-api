@@ -3,23 +3,13 @@ package com.l8group.videoeditor.dtos;
 import java.time.ZonedDateTime;
 
 public class VideoResizeResponseDTO {
-    private String fileName;
+    
     private String resolution;
-    private ZonedDateTime date;
+    private ZonedDateTime createdAt;
 
-    public VideoResizeResponseDTO(String fileName, String resolution, ZonedDateTime date) {
-        this.fileName = fileName;
+    public VideoResizeResponseDTO( String resolution, ZonedDateTime createdAt) {
         this.resolution = resolution;
-        this.date = date;
-
-    }
-
-    public String getFileName() {
-        return fileName;
-    }
-
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
+        this.createdAt = createdAt;
     }
 
     public String getResolution() {
@@ -30,12 +20,13 @@ public class VideoResizeResponseDTO {
         this.resolution = resolution;
     }
 
-    public ZonedDateTime getDate() {
-        return date;
+    public ZonedDateTime getCreatedAt() {
+        return createdAt;
     }
 
-    public void setDate(ZonedDateTime date) {
-        this.date = date;
+    public void setCreatedAt(ZonedDateTime createdAt) {
+        this.createdAt = createdAt;
     }
+
 
 }

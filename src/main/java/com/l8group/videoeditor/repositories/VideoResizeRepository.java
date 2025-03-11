@@ -5,7 +5,8 @@ import com.l8group.videoeditor.models.VideoResize;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
+import java.util.UUID;
 
-public interface VideoResizeRepository extends JpaRepository<VideoResize, Long> {
+public interface VideoResizeRepository extends JpaRepository<VideoResize, UUID> {
     Optional<VideoResize> findByVideoFileAndResolution(VideoFile videoFile, String resolution);
 }

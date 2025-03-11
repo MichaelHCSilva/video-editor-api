@@ -23,22 +23,22 @@ public class VideoOverlay {
     @Column(name = "created_at", nullable = false)
     private ZonedDateTime createdAt;
 
+    @Column(name = "updated_at", nullable = false)
+    private ZonedDateTime updatedAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private VideoStatus status;
 
-    @Column(name = "overlay_data", columnDefinition = "TEXT", nullable = false)
-    private String overlayData;
+    @Column(name = "watermark", columnDefinition = "TEXT", nullable = false)
+    private String watermark;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "position", nullable = false)
     private OverlayPosition overlayPosition;
 
     @Column(name = "font_size", nullable = false)
-    private Integer fontSize;  
-
-    @Column(name = "file_path")  
-    private String filePath;
+    private Integer fontSize;
 
     public UUID getId() {
         return id;
@@ -64,6 +64,14 @@ public class VideoOverlay {
         this.createdAt = createdAt;
     }
 
+    public ZonedDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(ZonedDateTime updatedAt) {
+        this.updatedAt = updatedAt;
+    }
+
     public VideoStatus getStatus() {
         return status;
     }
@@ -72,12 +80,12 @@ public class VideoOverlay {
         this.status = status;
     }
 
-    public String getOverlayData() {
-        return overlayData;
+    public String getWatermark() {
+        return watermark;
     }
 
-    public void setOverlayData(String overlayData) {
-        this.overlayData = overlayData;
+    public void setWatermark(String watermark) {
+        this.watermark = watermark;
     }
 
     public OverlayPosition getOverlayPosition() {
@@ -88,19 +96,12 @@ public class VideoOverlay {
         this.overlayPosition = overlayPosition;
     }
 
-    public int getFontSize() {  
+    public int getFontSize() {
         return fontSize;
     }
 
-    public void setFontSize(int fontSize) {  
+    public void setFontSize(int fontSize) {
         this.fontSize = fontSize;
     }
 
-    public String getFilePath() {
-        return filePath;
-    }
-
-    public void setFilePath(String filePath) {
-        this.filePath = filePath;
-    }
 }
