@@ -4,7 +4,7 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
-import com.l8group.videoeditor.enums.OverlayPosition;
+import com.l8group.videoeditor.enums.OverlayPositionEnum;
 
 public class VideoBatchRequest {
 
@@ -61,7 +61,7 @@ public class VideoBatchRequest {
         private Integer height; // Para RESIZE
         private String outputFormat; // Para CONVERT
         private String watermark; // Para OVERLAY
-        private OverlayPosition position; // Para OVERLAY
+        private OverlayPositionEnum position; // Para OVERLAY
         private Integer fontSize; // Para OVERLAY
 
         // Getters e setters para todos os campos
@@ -113,11 +113,11 @@ public class VideoBatchRequest {
             this.watermark = watermark;
         }
 
-        public OverlayPosition getPosition() {
+        public OverlayPositionEnum getPosition() {
             return position;
         }
 
-        public void setPosition(OverlayPosition position) {
+        public void setPosition(OverlayPositionEnum position) {
             this.position = position;
         }
 

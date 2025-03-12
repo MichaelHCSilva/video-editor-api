@@ -10,5 +10,5 @@ import java.util.UUID;
 @Repository
 public interface VideoConversionRepository extends JpaRepository<VideoConversion, UUID> {
 
-    Optional<VideoConversion> findByVideoFileIdAndOutputFormat(UUID videoFileId, String outputFormat);
+Optional<VideoConversion> findByVideoFileIdAndVideoTargetFormat(UUID videoFileId, String videoTargetFormat);
 }

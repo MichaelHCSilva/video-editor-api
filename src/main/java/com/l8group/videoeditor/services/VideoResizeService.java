@@ -12,15 +12,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoResize;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.repositories.VideoResizeRepository;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoResolutionsUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoResizeService {
@@ -48,7 +48,7 @@ public class VideoResizeService {
         VideoFile videoFile = videoFileRepository.findById(videoId)
                 .orElseThrow(() -> new IllegalArgumentException("Vídeo não encontrado para o ID: " + videoId));
 
-        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getFileName(), videoFile.getFilePath());
+        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getVideoFileName(), videoFile.getVideoFilePath());
 
         // Valida a resolução do vídeo
         if (!VideoResolutionsUtils.isValidResolution(request.getWidth(), request.getHeight())) {
@@ -60,7 +60,7 @@ public class VideoResizeService {
         // Determina qual arquivo usar como entrada
         String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
                 ? previousFilePath
-                : videoFile.getFilePath(); 
+                : videoFile.getVideoFilePath(); 
 
         logger.info("Arquivo de entrada definido como: {}", inputFilePath);
 
@@ -71,13 +71,13 @@ public class VideoResizeService {
             throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
-        String originalFileName = videoFile.getFileName();
-        String shortUUID = VideoUtils.generateShortUUID();
-        String formattedDate = VideoUtils.formatDate(LocalDate.now());
+        String originalFileName = videoFile.getVideoFileName();
+        String shortUUID = VideoUtils.generateShortUuid();
+        String formattedDate = VideoUtils.formatDateToCompactString(LocalDate.now());
 
         // Nome do arquivo redimensionado
         String resizeFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.'))
-                + "_" + shortUUID + formattedDate + "_resize." + videoFile.getFileFormat();
+                + "_" + shortUUID + formattedDate + "_resize." + videoFile.getVideoFileFormat();
 
         // Caminho do arquivo temporário de saída
         String outputFilePath = Paths.get(TEMP_DIR, resizeFileName).toString();
@@ -100,10 +100,10 @@ public class VideoResizeService {
         // Salva os dados no banco de dados
         VideoResize videoResize = new VideoResize();
         videoResize.setVideoFile(videoFile);
-        videoResize.setResolution(request.getWidth() + "x" + request.getHeight());
-        videoResize.setCreatedAt(ZonedDateTime.now());
-        videoResize.setUpdatedAt(ZonedDateTime.now());
-        videoResize.setStatus(VideoStatus.PROCESSING);
+        videoResize.setTargetResolution(request.getWidth() + "x" + request.getHeight());
+        videoResize.setCreatedTimes(ZonedDateTime.now());
+        videoResize.setUpdatedTimes(ZonedDateTime.now());
+        videoResize.setStatus(VideoStatusEnum.PROCESSING);
 
         videoResize = videoResizeRepository.save(videoResize);
         logger.info("Registro de redimensionamento salvo no banco de dados. ID={}", videoResize.getId());

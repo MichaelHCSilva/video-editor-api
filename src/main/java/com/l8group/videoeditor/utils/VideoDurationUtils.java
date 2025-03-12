@@ -6,6 +6,8 @@ import java.io.InputStreamReader;
 
 public class VideoDurationUtils {
 
+    private static final String DEFAULT_DURATION = "00:00:00";
+
     /**
      * Obtém a duração de um vídeo no formato HH:mm:ss usando FFmpeg.
      *
@@ -14,8 +16,8 @@ public class VideoDurationUtils {
      * @throws IOException Se houver erro ao executar o comando FFmpeg.
      */
     public static String getVideoDurationAsString(String filePath) throws IOException {
-        String duration = executeFFmpegCommand(filePath);
-        return formatDuration(duration);
+        String duration = runFFmpegDurationCommand(filePath);
+        return normalizeDurationFormat(duration);
     }
 
     /**
@@ -25,9 +27,8 @@ public class VideoDurationUtils {
      * @return Duração no formato HH:mm:ss.
      * @throws IOException Se houver erro ao executar o FFmpeg.
      */
-    private static String executeFFmpegCommand(String filePath) throws IOException {
-        ProcessBuilder processBuilder = new ProcessBuilder(
-                "ffmpeg", "-i", filePath);
+    private static String runFFmpegDurationCommand(String filePath) throws IOException {
+        ProcessBuilder processBuilder = new ProcessBuilder("ffmpeg", "-i", filePath);
         processBuilder.redirectErrorStream(true);
         Process process = processBuilder.start();
 
@@ -53,28 +54,27 @@ public class VideoDurationUtils {
         String[] parts = line.split(",");
         for (String part : parts) {
             if (part.trim().startsWith("Duration:")) {
-                String duration = part.replace("Duration:", "").trim(); // Remove "Duration:" e espaços
-                return duration.split(" ")[0]; // Pega apenas "HH:mm:ss"
+                return part.replace("Duration:", "").trim().split(" ")[0]; // Pega apenas "HH:mm:ss"
             }
         }
-        return "00:00:00";
+        return DEFAULT_DURATION;
     }
 
     /**
-     * Converte uma string de duração (HH:mm:ss) para um formato padronizado.
+     * Normaliza uma string de duração (HH:mm:ss) garantindo que tenha o formato correto.
      *
      * @param duration Duração no formato HH:mm:ss.
-     * @return String formatada no mesmo formato.
+     * @return String formatada corretamente.
      */
-    private static String formatDuration(String duration) {
-        String[] timeParts = duration.trim().split(":"); // Remove espaços antes de dividir
+    private static String normalizeDurationFormat(String duration) {
+        String[] timeParts = duration.trim().split(":");
         if (timeParts.length == 3) {
-            int hours = Integer.parseInt(timeParts[0].trim()); // Remove espaços antes de converter
+            int hours = Integer.parseInt(timeParts[0].trim());
             int minutes = Integer.parseInt(timeParts[1].trim());
             int seconds = (int) Math.floor(Double.parseDouble(timeParts[2].trim()));
             return String.format("%02d:%02d:%02d", hours, minutes, seconds);
         }
-        return "00:00:00";
+        return DEFAULT_DURATION;
     }
 
     /**
@@ -93,12 +93,17 @@ public class VideoDurationUtils {
         int seconds = Integer.parseInt(parts[2]);
         return (hours * 3600) + (minutes * 60) + seconds;
     }
-    
+
+    /**
+     * Converte um tempo em segundos para o formato "HH:mm:ss".
+     *
+     * @param totalSeconds Tempo em segundos.
+     * @return Tempo formatado como string "HH:mm:ss".
+     */
     public static String formatSecondsToTime(int totalSeconds) {
         int hours = totalSeconds / 3600;
         int minutes = (totalSeconds % 3600) / 60;
         int seconds = totalSeconds % 60;
         return String.format("%02d:%02d:%02d", hours, minutes, seconds);
     }
-
 }

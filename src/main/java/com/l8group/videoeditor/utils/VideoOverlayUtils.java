@@ -8,14 +8,14 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.l8group.videoeditor.enums.OverlayPosition;
+import com.l8group.videoeditor.enums.OverlayPositionEnum;
 
-public class VideoLuminosityProcessorUtils {
+public class VideoOverlayUtils {
 
-    private static final Logger logger = LoggerFactory.getLogger(VideoLuminosityProcessorUtils.class);
+    private static final Logger logger = LoggerFactory.getLogger(VideoOverlayUtils.class);
 
-    public static boolean addTextOverlay(String inputFilePath, String outputFilePath, String text,
-                                        OverlayPosition position, int fontSize, String fontFile) {
+    public static boolean applyTextOverlayWithFFmpeg(String inputFilePath, String outputFilePath, String text,
+                                        OverlayPositionEnum position, int fontSize, String fontFile) {
         try {
             if (fontFile == null || fontFile.isEmpty()) {
                 // Fonte padrão encontrada pelo FFmpeg
@@ -40,7 +40,7 @@ public class VideoLuminosityProcessorUtils {
         }
     }
 
-    private static String getDrawTextCommand(String text, OverlayPosition position, int fontSize, String fontFile) {
+    private static String getDrawTextCommand(String text, OverlayPositionEnum position, int fontSize, String fontFile) {
         String baseText = String.format(
                 "drawtext=fontfile='%s':text='%s':fontsize=%d:box=1:boxcolor=black@0.5:boxborderw=5",
                 fontFile, text, fontSize

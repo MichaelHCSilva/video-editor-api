@@ -8,5 +8,5 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VideoResizeRepository extends JpaRepository<VideoResize, UUID> {
-    Optional<VideoResize> findByVideoFileAndResolution(VideoFile videoFile, String resolution);
+    Optional<VideoResize> findByVideoFileAndTargetResolution(VideoFile videoFile, String targetResolution);
 }

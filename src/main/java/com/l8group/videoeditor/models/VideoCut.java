@@ -3,34 +3,34 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "videos_cut") 
+@Table(name = "videos_cuts")
 public class VideoCut {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
-    
+
     @ManyToOne
     @JoinColumn(name = "video_file_id", nullable = false)
     private VideoFile videoFile;
 
-    @Column(name = "duration", nullable = false)
-    private String duration; 
+    @Column(name = "video_cut_duration", nullable = false)
+    private String videoCutDuration;
 
     @Column(name = "updated_at", nullable = false)
-    private ZonedDateTime updatedAt;
+    private ZonedDateTime updatedTimes;
 
     @Column(name = "created_at", nullable = false)
-    private ZonedDateTime createdAt;
+    private ZonedDateTime createdTimes;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private VideoStatus status;
+    private VideoStatusEnum status;
 
     public UUID getId() {
         return id;
@@ -48,45 +48,36 @@ public class VideoCut {
         this.videoFile = videoFile;
     }
 
-    public String getDuration() {  
-        return duration;
+    public String getVideoCutDuration() {
+        return videoCutDuration;
     }
 
-    public void setDuration(String duration) {  
-        this.duration = duration;
+    public void setVideoCutDuration(String videoCutDuration) {
+        this.videoCutDuration = videoCutDuration;
     }
 
-    public ZonedDateTime getUpdatedAt() {
-        return updatedAt;
+    public ZonedDateTime getUpdatedTimes() {
+        return updatedTimes;
     }
 
-    public void setUpdatedAt(ZonedDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+    public void setUpdatedTimes(ZonedDateTime updatedTimes) {
+        this.updatedTimes = updatedTimes;
     }
 
-    public ZonedDateTime getCreatedAt() {
-        return createdAt;
+    public ZonedDateTime getCreatedTimes() {
+        return createdTimes;
     }
 
-    public void setCreatedAt(ZonedDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setCreatedTimes(ZonedDateTime createdTimes) {
+        this.createdTimes = createdTimes;
     }
 
-    public VideoStatus getStatus() {
+    public VideoStatusEnum getStatus() {
         return status;
     }
 
-    public void setStatus(VideoStatus status) {
+    public void setStatus(VideoStatusEnum status) {
         this.status = status;
     }
 
-
-
-
-
-
-
-
-
-    
 }

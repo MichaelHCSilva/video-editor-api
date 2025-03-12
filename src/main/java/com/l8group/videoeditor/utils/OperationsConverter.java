@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 @Converter(autoApply = true)
-public class OperationsConverterUtils implements AttributeConverter<List<String>, String> {
+public class OperationsConverter implements AttributeConverter<List<String>, String> {
 
     private static final String SEPARATOR = " - ";
 

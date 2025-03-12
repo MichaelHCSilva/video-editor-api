@@ -15,14 +15,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoConversion;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoConversionRepository;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoConversionService {
@@ -54,12 +54,12 @@ public class VideoConversionService {
                     return new RuntimeException("Vídeo não encontrado para o ID: " + videoId);
                 });
 
-        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getFileName(), videoFile.getFilePath());
+        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getVideoFileName(), videoFile.getVideoFilePath());
 
         // Determina o arquivo de entrada
         String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
                 ? previousFilePath
-                : videoFile.getFilePath();
+                : videoFile.getVideoFilePath();
 
         logger.info("Arquivo de entrada definido como: {}", inputFilePath);
 
@@ -70,9 +70,9 @@ public class VideoConversionService {
             throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
-        String originalFileName = videoFile.getFileName();
-        String shortUUID = VideoUtils.generateShortUUID();
-        String formattedDate = VideoUtils.formatDate(LocalDate.now());
+        String originalFileName = videoFile.getVideoFileName();
+        String shortUUID = VideoUtils.generateShortUuid();
+        String formattedDate = VideoUtils.formatDateToCompactString(LocalDate.now());
 
         // Geração do nome do arquivo convertido
         String baseFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')); // Nome sem extensão
@@ -117,11 +117,11 @@ public class VideoConversionService {
     private VideoConversion createAndSaveVideoConversion(VideoFile videoFile, String outputFormat) {
         VideoConversion videoConversion = new VideoConversion();
         videoConversion.setVideoFile(videoFile);
-        videoConversion.setOutputFormat(outputFormat);
-        videoConversion.setInputFormat(videoFile.getFileFormat());
-        videoConversion.setCreatedAt(ZonedDateTime.now());
-        videoConversion.setUpdatedAt(ZonedDateTime.now());
-        videoConversion.setStatus(VideoStatus.PROCESSING);
+        videoConversion.setVideoTargetFormat(outputFormat);
+        videoConversion.setVideoFileFormat(videoFile.getVideoFileFormat());
+        videoConversion.setCreatedTimes(ZonedDateTime.now());
+        videoConversion.setUpdatedTimes(ZonedDateTime.now());
+        videoConversion.setStatus(VideoStatusEnum.PROCESSING);
 
         return videoConversionRepository.save(videoConversion);
     }

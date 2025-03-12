@@ -1,6 +1,6 @@
 package com.l8group.videoeditor.enums;
 
-public enum VideoStatus {
+public enum VideoStatusEnum {
     PROCESSING,
     COMPLETED,
     ERROR

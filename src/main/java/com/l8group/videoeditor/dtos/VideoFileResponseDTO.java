@@ -9,7 +9,6 @@ public class VideoFileResponseDTO {
     private String fileName;
     private ZonedDateTime createdAt;
     
-
     public VideoFileResponseDTO(UUID id, String fileName, ZonedDateTime createdAt) {
         this.id = id;
         this.fileName = fileName;

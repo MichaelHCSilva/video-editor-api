@@ -19,17 +19,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
-import com.l8group.videoeditor.enums.VideoStatus;
-import com.l8group.videoeditor.models.VideoBatchProcess;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoBatchProcessRepository;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoBatchRequest;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoUtils;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoBatchService {
@@ -80,8 +80,8 @@ public class VideoBatchService {
                         return new RuntimeException("Vídeo original não encontrado.");
                     });
 
-            String currentInputFilePath = Paths.get(UPLOAD_DIR, originalVideoFile.getFileName()).toString();
-            String outputFormat = originalVideoFile.getFileFormat().replace(".", "");
+            String currentInputFilePath = Paths.get(UPLOAD_DIR, originalVideoFile.getVideoFileName()).toString();
+            String outputFormat = originalVideoFile.getVideoFileFormat().replace(".", "");
 
             for (VideoBatchRequest.BatchOperation operation : request.getOperations()) {
                 if ("CONVERT".equalsIgnoreCase(operation.getOperationType())
@@ -135,18 +135,17 @@ public class VideoBatchService {
 
             deleteIntermediateFiles(intermediateFiles);
 
-            VideoBatchProcess batchProcess = createAndSaveBatchProcess(originalVideoFile, request.getOperations(), finalOutputFileName);
+            VideoProcessingBatch batchProcess = createAndSaveBatchProcess(originalVideoFile, request.getOperations(),
+                    finalOutputFileName);
 
             logger.info("✅ [processBatch] Processamento concluído | Vídeo ID: {} | Arquivo final: {}",
                     originalVideoFile.getId(), finalOutputPath);
 
-                    return new VideoBatchResponseDTO(
-                        batchProcess.getId(), // ID do processamento em lote
-                        finalOutputFileName, 
-                        batchProcess.getCreatedAt(), 
-                        batchProcess.getOperations()
-                    );
-                    
+            return new VideoBatchResponseDTO(
+                    batchProcess.getId(), // ID do processamento em lote
+                    finalOutputFileName,
+                    batchProcess.getCreatedTimes(),
+                    batchProcess.getProcessingSteps());
 
         } catch (Exception e) {
             logger.error("❌ [processBatch] Erro geral durante o processamento do lote", e);
@@ -231,23 +230,24 @@ public class VideoBatchService {
         }
     }
 
-    private VideoBatchProcess createAndSaveBatchProcess(VideoFile videoFile,
+    private VideoProcessingBatch createAndSaveBatchProcess(VideoFile videoFile,
             List<VideoBatchRequest.BatchOperation> operations, String processedFileName) {
-        VideoBatchProcess batchProcess = new VideoBatchProcess();
+        VideoProcessingBatch batchProcess = new VideoProcessingBatch();
         batchProcess.setVideoFile(videoFile);
-        batchProcess.setStatus(VideoStatus.PROCESSING);
-        batchProcess.setCreatedAt(ZonedDateTime.now());
-        batchProcess.setUpdatedAt(ZonedDateTime.now());
-        batchProcess.setProcessedFileName(processedFileName);
-        batchProcess.setOperations(operations.stream().map(VideoBatchRequest.BatchOperation::getOperationType)
+        batchProcess.setStatus(VideoStatusEnum.PROCESSING);
+        batchProcess.setCreatedTimes(ZonedDateTime.now());
+        batchProcess.setUpdatedTimes(ZonedDateTime.now());
+        batchProcess.setVideoOutputFileName(processedFileName);
+        batchProcess.setProcessingSteps(operations.stream().map(VideoBatchRequest.BatchOperation::getOperationType)
                 .collect(Collectors.toList()));
         return videoBatchProcessRepository.save(batchProcess);
     }
 
     private String generateFinalOutputFileName(VideoFile videoFile, String outputFormat) {
-        String shortUUID = VideoUtils.generateShortUUID();
-        String formattedDate = VideoUtils.formatDate(ZonedDateTime.now().toLocalDate());
-        String originalFileName = videoFile.getFileName().substring(0, videoFile.getFileName().lastIndexOf(".")); // Remove
+        String shortUUID = VideoUtils.generateShortUuid();
+        String formattedDate = VideoUtils.formatDateToCompactString(ZonedDateTime.now().toLocalDate());
+        String originalFileName = videoFile.getVideoFileName().substring(0,
+                videoFile.getVideoFileName().lastIndexOf(".")); // Remove
         return originalFileName + "_" + shortUUID + formattedDate + "_processed." + outputFormat;
     }
 }

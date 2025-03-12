@@ -1,29 +1,32 @@
 package com.l8group.videoeditor.models;
 
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.utils.OperationsConverter;
 
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "videos_conversions")
-public class VideoConversion {
+@Table(name = "video_processing_batches")
+public class VideoProcessingBatch {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
     @ManyToOne
-    @JoinColumn(name = "video_files_id", nullable = false)
+    @JoinColumn(name = "video_file_id", nullable = false)
     private VideoFile videoFile;
 
-    @Column(name = "video_file_format", nullable = false)
-    private String videoFileFormat;
+    @Column(name = "video_output_filename", nullable = false)
+    private String videoOutputFileName;
 
-    @Column(name = "video_target_format", nullable = false)
-    private String videoTargetFormat;
+    @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
+    private VideoStatusEnum status;
 
     @Column(name = "created_at", nullable = false)
     private ZonedDateTime createdTimes;
@@ -31,9 +34,9 @@ public class VideoConversion {
     @Column(name = "updated_at", nullable = false)
     private ZonedDateTime updatedTimes;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false)
-    private VideoStatusEnum status;
+    @Column(name = "processing_steps", nullable = false)
+    @Convert(converter = OperationsConverter.class)
+    private List<String> processingSteps;
 
     public UUID getId() {
         return id;
@@ -51,20 +54,20 @@ public class VideoConversion {
         this.videoFile = videoFile;
     }
 
-    public String getVideoFileFormat() {
-        return videoFileFormat;
+    public String getVideoOutputFileName() {
+        return videoOutputFileName;
     }
 
-    public void setVideoFileFormat(String videoFileFormat) {
-        this.videoFileFormat = videoFileFormat;
+    public void setVideoOutputFileName(String videoOutputFileName) {
+        this.videoOutputFileName = videoOutputFileName;
     }
 
-    public String getVideoTargetFormat() {
-        return videoTargetFormat;
+    public VideoStatusEnum getStatus() {
+        return status;
     }
 
-    public void setVideoTargetFormat(String videoTargetFormat) {
-        this.videoTargetFormat = videoTargetFormat;
+    public void setStatus(VideoStatusEnum status) {
+        this.status = status;
     }
 
     public ZonedDateTime getCreatedTimes() {
@@ -83,12 +86,12 @@ public class VideoConversion {
         this.updatedTimes = updatedTimes;
     }
 
-    public VideoStatusEnum getStatus() {
-        return status;
+    public List<String> getProcessingSteps() {
+        return processingSteps;
     }
-
-    public void setStatus(VideoStatusEnum status) {
-        this.status = status;
+      
+    public void setProcessingSteps(List<String> processingSteps) {
+        this.processingSteps = processingSteps;
     }
 
 }

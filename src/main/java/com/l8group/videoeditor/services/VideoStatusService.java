@@ -1,6 +1,6 @@
-package com.l8group.videoeditor.utils;
+package com.l8group.videoeditor.services;
 
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -13,17 +13,17 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-public class VideoStatusUpdateUtils {
+public class VideoStatusService {
 
-    private static final Logger logger = LoggerFactory.getLogger(VideoStatusUpdateUtils.class);
+    private static final Logger logger = LoggerFactory.getLogger(VideoStatusService.class);
 
     @Transactional
-    public <T> void updateStatus(JpaRepository<T, UUID> repository, UUID entityId, VideoStatus status) {
+    public <T> void updateVideoStatus(JpaRepository<T, UUID> repository, UUID entityId, VideoStatusEnum status) {
         Optional<T> entityOptional = repository.findById(entityId);
         if (entityOptional.isPresent()) {
             T entity = entityOptional.get();
             try {
-                updateStatusAndUpdatedAt(entity, status);
+                updateStatusAndTimestamp(entity, status);
                 repository.save(entity);
                 logger.info("Status atualizado para {} na entidade com ID: {}", status, entityId);
             } catch (NoSuchMethodException e) {
@@ -39,8 +39,8 @@ public class VideoStatusUpdateUtils {
         }
     }
 
-    private <T> void updateStatusAndUpdatedAt(T entity, VideoStatus status) throws Exception {
-        Method setStatusMethod = findMethod(entity.getClass(), "setStatus", VideoStatus.class);
+    private <T> void updateStatusAndTimestamp(T entity, VideoStatusEnum status) throws Exception {
+        Method setStatusMethod = findMethod(entity.getClass(), "setStatus", VideoStatusEnum.class);
         Method setUpdatedAtMethod = findMethod(entity.getClass(), "setUpdatedAt", ZonedDateTime.class);
 
         if (setStatusMethod != null && setUpdatedAtMethod != null) {

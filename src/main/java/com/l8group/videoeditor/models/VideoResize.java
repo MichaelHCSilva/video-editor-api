@@ -3,12 +3,12 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "videos_resize")
+@Table(name = "videos_resizes")
 public class VideoResize {
 
     @Id
@@ -21,16 +21,16 @@ public class VideoResize {
 
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
-    private VideoStatus status;
+    private VideoStatusEnum status;
 
     @Column(name = "created_at", nullable = false)
-    private ZonedDateTime createdAt;
+    private ZonedDateTime createdTimes;
 
     @Column(name = "updated_at", nullable = false)
-    private ZonedDateTime updatedAt;
+    private ZonedDateTime updatedTimes;
 
-    @Column(name = "resolution", nullable = false)
-    private String resolution;
+    @Column(name = "target_resolution", nullable = false)
+    private String targetResolution;
 
     public UUID getId() {
         return id;
@@ -48,37 +48,36 @@ public class VideoResize {
         this.videoFile = videoFile;
     }
 
-    public VideoStatus getStatus() {
+    public VideoStatusEnum getStatus() {
         return status;
     }
 
-    public void setStatus(VideoStatus status) {
+    public void setStatus(VideoStatusEnum status) {
         this.status = status;
     }
 
-    public ZonedDateTime getCreatedAt() {
-        return createdAt;
+    public ZonedDateTime getCreatedTimes() {
+        return createdTimes;
     }
 
-    public void setCreatedAt(ZonedDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setCreatedTimes(ZonedDateTime createdTimes) {
+        this.createdTimes = createdTimes;
     }
 
-    public ZonedDateTime getUpdatedAt() {
-        return updatedAt;
+    public ZonedDateTime getUpdatedTimes() {
+        return updatedTimes;
     }
 
-    public void setUpdatedAt(ZonedDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+    public void setUpdatedTimes(ZonedDateTime updatedTimes) {
+        this.updatedTimes = updatedTimes;
     }
 
-    public String getResolution() {
-        return resolution;
+    public String getTargetResolution() {
+        return targetResolution;
     }
 
-    public void setResolution(String resolution) {
-        this.resolution = resolution;
+    public void setTargetResolution(String targetResolution) {
+        this.targetResolution = targetResolution;
     }
 
-    
 }

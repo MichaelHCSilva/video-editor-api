@@ -3,7 +3,7 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
 
@@ -15,30 +15,30 @@ public class VideoFile {
     @GeneratedValue(strategy = GenerationType.AUTO)
     private UUID id;
 
-    @Column(name = "file_name", nullable = false)
-    private String fileName;
+    @Column(name = "video_file_name", nullable = false)
+    private String videoFileName;
 
-    @Column(name = "file_size", nullable = false)
-    private Long fileSize;
+    @Column(name = "video_file_size", nullable = false)
+    private Long videoFileSize;
 
-    @Column(name = "file_format", nullable = false)
-    private String fileFormat;
+    @Column(name = "video_file_format", nullable = false)
+    private String videoFileFormat;
 
     @Column(name = "created_at", nullable = false)
-    private ZonedDateTime createdAt;
+    private ZonedDateTime createdTimes;
 
     @Column(name = "updated_at", nullable = false)
-    private ZonedDateTime updatedAt;
+    private ZonedDateTime updatedTimes;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private VideoStatus status;
+    private VideoStatusEnum status;
 
-    @Column(name = "duration", nullable = false)
-    private String duration;
+    @Column(name = "video_duration", nullable = false)
+    private String videoDuration;
 
-    @Column(name = "filePath", nullable = false)
-    private String filePath;
+    @Column(name = "video_file_path", nullable = false)
+    private String videoFilePath;
 
     public UUID getId() {
         return id;
@@ -48,70 +48,68 @@ public class VideoFile {
         this.id = id;
     }
 
-    public String getFileName() {
-        return fileName;
+    public String getVideoFileName() {
+        return videoFileName;
     }
 
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
+    public void setVideoFileName(String videoFileName) {
+        this.videoFileName = videoFileName;
     }
 
-    public Long getFileSize() {
-        return fileSize;
+    public Long getVideoFileSize() {
+        return videoFileSize;
     }
 
-    public void setFileSize(Long fileSize) {
-        this.fileSize = fileSize;
+    public void setVideoFileSize(Long videoFileSize) {
+        this.videoFileSize = videoFileSize;
     }
 
-    public String getFileFormat() {
-        return fileFormat;
+    public String getVideoFileFormat() {
+        return videoFileFormat;
     }
 
-    public void setFileFormat(String fileFormat) {
-        this.fileFormat = fileFormat;
+    public void setVideoFileFormat(String videoFileFormat) {
+        this.videoFileFormat = videoFileFormat;
     }
 
-    public ZonedDateTime getCreatedAt() {
-        return createdAt;
+    public ZonedDateTime getCreatedTimes() {
+        return createdTimes;
     }
 
-    public void setCreatedAt(ZonedDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setCreatedTimes(ZonedDateTime createdTimes) {
+        this.createdTimes = createdTimes;
     }
 
-    public ZonedDateTime getUpdatedAt() {
-        return updatedAt;
+    public ZonedDateTime getUpdatedTimes() {
+        return updatedTimes;
     }
 
-    public void setUpdatedAt(ZonedDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+    public void setUpdatedTimes(ZonedDateTime updatedTimes) {
+        this.updatedTimes = updatedTimes;
     }
 
-    public VideoStatus getStatus() {
+    public VideoStatusEnum getStatus() {
         return status;
     }
 
-    public void setStatus(VideoStatus status) {
+    public void setStatus(VideoStatusEnum status) {
         this.status = status;
     }
 
-    public String getDuration() {
-        return duration;
+    public String getVideoDuration() {
+        return videoDuration;
     }
 
-    public void setDuration(String duration) {
-        this.duration = duration;
+    public void setVideoDuration(String videoDuration) {
+        this.videoDuration = videoDuration;
     }
 
-    public String getFilePath() {
-        return filePath;
+    public String getVideoFilePath() {
+        return videoFilePath;
     }
 
-    public void setFilePath(String filePath) {
-        this.filePath = filePath;
+    public void setVideoFilePath(String videoFilePath) {
+        this.videoFilePath = videoFilePath;
     }
-
-    
 
 }

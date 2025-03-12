@@ -3,8 +3,8 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
-import com.l8group.videoeditor.enums.OverlayPosition;
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.OverlayPositionEnum;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
 
@@ -21,24 +21,24 @@ public class VideoOverlay {
     private VideoFile videoFile;
 
     @Column(name = "created_at", nullable = false)
-    private ZonedDateTime createdAt;
+    private ZonedDateTime createdTimes;
 
     @Column(name = "updated_at", nullable = false)
-    private ZonedDateTime updatedAt;
+    private ZonedDateTime updatedTimes;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private VideoStatus status;
+    private VideoStatusEnum status;
 
-    @Column(name = "watermark", columnDefinition = "TEXT", nullable = false)
-    private String watermark;
+    @Column(name = "overlay_text", columnDefinition = "TEXT", nullable = false)
+    private String overlayText;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "position", nullable = false)
-    private OverlayPosition overlayPosition;
+    @Column(name = "overlay_position", nullable = false)
+    private OverlayPositionEnum overlayPosition;
 
-    @Column(name = "font_size", nullable = false)
-    private Integer fontSize;
+    @Column(name = "overlay_font_size", nullable = false)
+    private Integer overlayFontSize;
 
     public UUID getId() {
         return id;
@@ -56,52 +56,52 @@ public class VideoOverlay {
         this.videoFile = videoFile;
     }
 
-    public ZonedDateTime getCreatedAt() {
-        return createdAt;
+    public ZonedDateTime getCreatedTimes() {
+        return createdTimes;
     }
 
-    public void setCreatedAt(ZonedDateTime createdAt) {
-        this.createdAt = createdAt;
+    public void setCreatedTimes(ZonedDateTime createdTimes) {
+        this.createdTimes = createdTimes;
     }
 
-    public ZonedDateTime getUpdatedAt() {
-        return updatedAt;
+    public ZonedDateTime getUpdatedTimes() {
+        return updatedTimes;
     }
 
-    public void setUpdatedAt(ZonedDateTime updatedAt) {
-        this.updatedAt = updatedAt;
+    public void setUpdatedTimes(ZonedDateTime updatedTimes) {
+        this.updatedTimes = updatedTimes;
     }
 
-    public VideoStatus getStatus() {
+    public VideoStatusEnum getStatus() {
         return status;
     }
 
-    public void setStatus(VideoStatus status) {
+    public void setStatus(VideoStatusEnum status) {
         this.status = status;
     }
 
-    public String getWatermark() {
-        return watermark;
+    public String getOverlayText() {
+        return overlayText;
     }
 
-    public void setWatermark(String watermark) {
-        this.watermark = watermark;
+    public void setOverlayText(String overlayText) {
+        this.overlayText = overlayText;
     }
 
-    public OverlayPosition getOverlayPosition() {
+    public OverlayPositionEnum getOverlayPosition() {
         return overlayPosition;
     }
 
-    public void setOverlayPosition(OverlayPosition overlayPosition) {
+    public void setOverlayPosition(OverlayPositionEnum overlayPosition) {
         this.overlayPosition = overlayPosition;
     }
 
-    public int getFontSize() {
-        return fontSize;
+    public Integer getOverlayFontSize() {
+        return overlayFontSize;
     }
 
-    public void setFontSize(int fontSize) {
-        this.fontSize = fontSize;
+    public void setOverlayFontSize(Integer overlayFontSize) {
+        this.overlayFontSize = overlayFontSize;
     }
 
 }

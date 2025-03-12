@@ -12,15 +12,15 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoCutRepository;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoCutService {
@@ -48,12 +48,12 @@ public class VideoCutService {
         VideoFile videoFile = videoFileRepository.findById(videoId)
                 .orElseThrow(() -> new IllegalArgumentException("Vídeo não encontrado para o ID: " + videoId));
 
-        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getFileName(), videoFile.getFilePath());
+        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getVideoFileName(), videoFile.getVideoFilePath());
 
         // Determina qual arquivo será usado como entrada
         String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
                 ? previousFilePath
-                : videoFile.getFilePath();
+                : videoFile.getVideoFilePath();
 
         logger.info("Arquivo de entrada definido como: {}", inputFilePath);
 
@@ -64,13 +64,13 @@ public class VideoCutService {
             throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
-        String originalFileName = videoFile.getFileName();
-        String shortUUID = VideoUtils.generateShortUUID();
-        String formattedDate = VideoUtils.formatDate(LocalDate.now());
+        String originalFileName = videoFile.getVideoFileName();
+        String shortUUID = VideoUtils.generateShortUuid();
+        String formattedDate = VideoUtils.formatDateToCompactString(LocalDate.now());
 
         // Nome do arquivo cortado
         String cutFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.'))
-                + "_" + shortUUID + formattedDate + "_cut." + videoFile.getFileFormat();
+                + "_" + shortUUID + formattedDate + "_cut." + videoFile.getVideoFileFormat();
 
         String outputFilePath = Paths.get(TEMP_DIR, cutFileName).toString();
         logger.info("Arquivo de saída definido como: {}", outputFilePath);
@@ -103,10 +103,10 @@ public class VideoCutService {
         // Salva os dados do corte no banco de dados
         VideoCut videoCut = new VideoCut();
         videoCut.setVideoFile(videoFile);
-        videoCut.setDuration(durationFormatted);
-        videoCut.setCreatedAt(ZonedDateTime.now());
-        videoCut.setUpdatedAt(ZonedDateTime.now());
-        videoCut.setStatus(VideoStatus.PROCESSING);
+        videoCut.setVideoCutDuration(durationFormatted);
+        videoCut.setCreatedTimes(ZonedDateTime.now());
+        videoCut.setUpdatedTimes(ZonedDateTime.now());
+        videoCut.setStatus(VideoStatusEnum.PROCESSING);
 
         videoCut = videoCutRepository.save(videoCut);
         logger.info("Registro de corte salvo no banco de dados. ID={}", videoCut.getId());

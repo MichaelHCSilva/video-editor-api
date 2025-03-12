@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -13,8 +14,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.l8group.videoeditor.dtos.VideoFileListDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.exceptions.NoVideosFoundException;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
@@ -64,27 +67,37 @@ public class VideoFileService {
 
         // Criar entidade e salvar no banco
         VideoFile videoFile = new VideoFile();
-        videoFile.setFileName(safeFileName);
-        videoFile.setFileSize(file.getSize());
-        videoFile.setFileFormat(fileExtension);
-        videoFile.setCreatedAt(ZonedDateTime.now());
-        videoFile.setUpdatedAt(ZonedDateTime.now());
-        videoFile.setStatus(VideoStatus.PROCESSING);
-        videoFile.setFilePath(filePath);
+        videoFile.setVideoFileName(safeFileName);
+        videoFile.setVideoFileSize(file.getSize());
+        videoFile.setVideoFileFormat(fileExtension);
+        videoFile.setCreatedTimes(ZonedDateTime.now());
+        videoFile.setUpdatedTimes(ZonedDateTime.now());
+        videoFile.setStatus(VideoStatusEnum.PROCESSING);
+        videoFile.setVideoFilePath(filePath);
 
         // 🔹 Obtém a duração do vídeo antes de salvar
         String duration = VideoDurationUtils.getVideoDurationAsString(filePath);
-        videoFile.setDuration(duration);
+        videoFile.setVideoDuration(duration);
 
         videoFile = videoFileRepository.save(videoFile);
 
-        return new VideoFileResponseDTO(videoFile.getId(), videoFile.getFileName(), videoFile.getCreatedAt());
+        return new VideoFileResponseDTO(videoFile.getId(), videoFile.getVideoFileName(), videoFile.getCreatedTimes());
 
     }
 
     public VideoFile getVideoById(UUID id) {
         return videoFileRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Vídeo não encontrado para o ID: " + id));
+    }
+
+    public List<VideoFileListDTO> listAllVideos() {
+        List<VideoFileListDTO> videos = videoFileRepository.findAllVideos();
+
+        if (videos.isEmpty()) {
+            throw new NoVideosFoundException("Nenhum vídeo encontrado.");
+        }
+
+        return videos;
     }
 
     private void validateFileFormat(MultipartFile file) {
@@ -105,4 +118,5 @@ public class VideoFileService {
                         contentType.equals("video/x-msvideo") ||
                         contentType.equals("video/quicktime"));
     }
+
 }

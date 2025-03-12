@@ -1,6 +1,6 @@
 package com.l8group.videoeditor.enums;
 
-public enum OverlayPosition {
+public enum OverlayPositionEnum {
     TOP_LEFT("top-left"),
     TOP_RIGHT("top-right"),
     BOTTOM_LEFT("bottom-left"),
@@ -9,7 +9,7 @@ public enum OverlayPosition {
 
     private final String position;
 
-    OverlayPosition(String position) {
+    OverlayPositionEnum(String position) {
         this.position = position;
     }
 

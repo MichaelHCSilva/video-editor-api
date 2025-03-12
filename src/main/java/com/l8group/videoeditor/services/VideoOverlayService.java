@@ -15,14 +15,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.l8group.videoeditor.enums.VideoStatus;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoOverlay;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.repositories.VideoOverlayRepository;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
-import com.l8group.videoeditor.utils.VideoLuminosityProcessorUtils;
+import com.l8group.videoeditor.utils.VideoOverlayUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoOverlayService {
@@ -54,12 +54,12 @@ public class VideoOverlayService {
                     return new RuntimeException("Vídeo não encontrado para o ID: " + videoId);
                 });
 
-        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getFileName(), videoFile.getFilePath());
+        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getVideoFileName(), videoFile.getVideoFilePath());
 
         // Determina o arquivo de entrada
         String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
                 ? previousFilePath
-                : videoFile.getFilePath(); 
+                : videoFile.getVideoFilePath(); 
 
         logger.info("Arquivo de entrada definido como: {}", inputFilePath);
 
@@ -70,13 +70,13 @@ public class VideoOverlayService {
             throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
-        String originalFileName = videoFile.getFileName();
-        String shortUUID = VideoUtils.generateShortUUID();
-        String formattedDate = VideoUtils.formatDate(LocalDate.now());
+        String originalFileName = videoFile.getVideoFileName();
+        String shortUUID = VideoUtils.generateShortUuid();
+        String formattedDate = VideoUtils.formatDateToCompactString(LocalDate.now());
 
         // Nome do arquivo de saída
         String overlayFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.'))
-                + "_" + shortUUID + formattedDate + "_overlay." + videoFile.getFileFormat().replace(".", "");
+                + "_" + shortUUID + formattedDate + "_overlay." + videoFile.getVideoFileFormat().replace(".", "");
 
         String outputFilePath = Paths.get(TEMP_DIR, overlayFileName).toString();
         logger.info("Arquivo de saída definido como: {}", outputFilePath);
@@ -86,7 +86,7 @@ public class VideoOverlayService {
 
         // Processa o overlay
         logger.info("Iniciando processamento do overlay: {} → {}", inputFilePath, outputFilePath);
-        boolean success = VideoLuminosityProcessorUtils.addTextOverlay(
+        boolean success = VideoOverlayUtils.applyTextOverlayWithFFmpeg(
                 inputFilePath, outputFilePath, request.getWatermark(), request.getPosition(), request.getFontSize(), null);
 
         if (!success) {
@@ -118,12 +118,12 @@ public class VideoOverlayService {
     private VideoOverlay createAndSaveVideoOverlay(VideoFile videoFile, VideoOverlayRequest request) {
         VideoOverlay videoOverlay = new VideoOverlay();
         videoOverlay.setVideoFile(videoFile);
-        videoOverlay.setCreatedAt(ZonedDateTime.now());
-        videoOverlay.setUpdatedAt(ZonedDateTime.now());
-        videoOverlay.setStatus(VideoStatus.PROCESSING);
-        videoOverlay.setWatermark(request.getWatermark());
+        videoOverlay.setCreatedTimes(ZonedDateTime.now());
+        videoOverlay.setUpdatedTimes(ZonedDateTime.now());
+        videoOverlay.setStatus(VideoStatusEnum.PROCESSING);
+        videoOverlay.setOverlayText(request.getWatermark());
         videoOverlay.setOverlayPosition(request.getPosition());
-        videoOverlay.setFontSize(request.getFontSize());
+        videoOverlay.setOverlayFontSize(request.getFontSize());
 
         return videoOverlayRepository.save(videoOverlay);
     }

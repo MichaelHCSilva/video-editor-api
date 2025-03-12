@@ -1,6 +1,6 @@
 package com.l8group.videoeditor.requests;
 
-import com.l8group.videoeditor.enums.OverlayPosition;
+import com.l8group.videoeditor.enums.OverlayPositionEnum;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -17,7 +17,7 @@ public class VideoOverlayRequest {
     private String watermark;
 
     @NotNull(message = "A posição é obrigatória.")
-    private OverlayPosition position;
+    private OverlayPositionEnum position;
 
     @Min(value = 1, message = "O tamanho da fonte deve ser maior que 0.")
     private Integer fontSize;
@@ -38,11 +38,11 @@ public class VideoOverlayRequest {
         this.watermark = watermark;
     }
 
-    public OverlayPosition getPosition() {
+    public OverlayPositionEnum getPosition() {
         return position;
     }
 
-    public void setPosition(OverlayPosition position) {
+    public void setPosition(OverlayPositionEnum position) {
         this.position = position;
     }
 
