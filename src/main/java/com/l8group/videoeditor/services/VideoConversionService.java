@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoConversion;
 import com.l8group.videoeditor.models.VideoFile;
+import com.l8group.videoeditor.rabbit.producer.VideoConversionProducer;
 import com.l8group.videoeditor.repositories.VideoConversionRepository;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
@@ -27,16 +28,20 @@ import com.l8group.videoeditor.repositories.VideoFileRepository;
 @Service
 public class VideoConversionService {
 
+    private static final Logger logger = LoggerFactory.getLogger(VideoConversionService.class);
+
     private final VideoFileRepository videoFileRepository;
     private final VideoConversionRepository videoConversionRepository;
-    private static final Logger logger = LoggerFactory.getLogger(VideoConversionService.class);
+    private final VideoConversionProducer videoConversionProducer;
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
-    public VideoConversionService(VideoFileRepository videoFileRepository, VideoConversionRepository videoConversionRepository) {
+    public VideoConversionService(VideoFileRepository videoFileRepository, VideoConversionRepository videoConversionRepository,
+                                  VideoConversionProducer videoConversionProducer) {
         this.videoFileRepository = videoFileRepository;
         this.videoConversionRepository = videoConversionRepository;
+        this.videoConversionProducer = videoConversionProducer;
     }
 
     @Transactional
@@ -123,7 +128,13 @@ public class VideoConversionService {
         videoConversion.setUpdatedTimes(ZonedDateTime.now());
         videoConversion.setStatus(VideoStatusEnum.PROCESSING);
 
-        return videoConversionRepository.save(videoConversion);
+        // Salva primeiro para obter o ID
+        videoConversion = videoConversionRepository.save(videoConversion);
+
+        // Envia a mensagem para o RabbitMQ após o salvamento
+        videoConversionProducer.sendVideoConversionMessage(videoConversion.getId().toString());
+
+        return videoConversion;
     }
 
     // Remove arquivos temporários após a consolidação final

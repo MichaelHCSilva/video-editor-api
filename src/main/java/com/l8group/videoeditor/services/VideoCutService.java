@@ -3,6 +3,7 @@ package com.l8group.videoeditor.services;
 import java.io.File;
 import java.nio.file.Paths;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
@@ -15,12 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoFile;
+import com.l8group.videoeditor.rabbit.producer.VideoCutProducer;
 import com.l8group.videoeditor.repositories.VideoCutRepository;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoCutService {
@@ -32,10 +34,12 @@ public class VideoCutService {
 
     private final VideoFileRepository videoFileRepository;
     private final VideoCutRepository videoCutRepository;
+    private final VideoCutProducer videoCutProducer;
 
-    public VideoCutService(VideoFileRepository videoFileRepository, VideoCutRepository videoCutRepository) {
+    public VideoCutService(VideoFileRepository videoFileRepository, VideoCutRepository videoCutRepository, VideoCutProducer videoCutProducer) {
         this.videoFileRepository = videoFileRepository;
         this.videoCutRepository = videoCutRepository;
+        this.videoCutProducer = videoCutProducer;
     }
 
     @Transactional
@@ -109,7 +113,9 @@ public class VideoCutService {
         videoCut.setStatus(VideoStatusEnum.PROCESSING);
 
         videoCut = videoCutRepository.save(videoCut);
-        logger.info("Registro de corte salvo no banco de dados. ID={}", videoCut.getId());
+        logger.info("Registro de corte salvo no banco de dados. ID={}, Tempo de registro: {}", videoCut.getId(), LocalDateTime.now());
+
+        videoCutProducer.sendVideoCutId(videoCut.getId());
 
         return outputFilePath;
     }

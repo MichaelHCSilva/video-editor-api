@@ -18,32 +18,39 @@ import org.springframework.transaction.annotation.Transactional;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoOverlay;
+import com.l8group.videoeditor.rabbit.producer.VideoOverlayProducer;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.repositories.VideoOverlayRepository;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.utils.VideoOverlayUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoOverlayService {
 
+    private static final Logger logger = LoggerFactory.getLogger(VideoOverlayService.class);
+
     private final VideoFileRepository videoFileRepository;
     private final VideoOverlayRepository videoOverlayRepository;
-    private static final Logger logger = LoggerFactory.getLogger(VideoOverlayService.class);
+    private final VideoOverlayProducer videoOverlayProducer;
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
     public VideoOverlayService(VideoFileRepository videoFileRepository,
-                               VideoOverlayRepository videoOverlayRepository) {
+            VideoOverlayRepository videoOverlayRepository, VideoOverlayProducer videoOverlayProducer) {
         this.videoFileRepository = videoFileRepository;
         this.videoOverlayRepository = videoOverlayRepository;
+        this.videoOverlayProducer = videoOverlayProducer;
+
     }
 
     @Transactional
     public String processOverlay(VideoOverlayRequest request, String previousFilePath) {
-        logger.info("Iniciando overlay no vídeo. videoId={}, watermark={}, position={}, fontSize={}, previousFilePath={}",
-                request.getVideoId(), request.getWatermark(), request.getPosition(), request.getFontSize(), previousFilePath);
+        logger.info(
+                "Iniciando overlay no vídeo. videoId={}, watermark={}, position={}, fontSize={}, previousFilePath={}",
+                request.getVideoId(), request.getWatermark(), request.getPosition(), request.getFontSize(),
+                previousFilePath);
 
         UUID videoId = UUID.fromString(request.getVideoId());
 
@@ -59,7 +66,7 @@ public class VideoOverlayService {
         // Determina o arquivo de entrada
         String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
                 ? previousFilePath
-                : videoFile.getVideoFilePath(); 
+                : videoFile.getVideoFilePath();
 
         logger.info("Arquivo de entrada definido como: {}", inputFilePath);
 
@@ -87,7 +94,8 @@ public class VideoOverlayService {
         // Processa o overlay
         logger.info("Iniciando processamento do overlay: {} → {}", inputFilePath, outputFilePath);
         boolean success = VideoOverlayUtils.applyTextOverlayWithFFmpeg(
-                inputFilePath, outputFilePath, request.getWatermark(), request.getPosition(), request.getFontSize(), null);
+                inputFilePath, outputFilePath, request.getWatermark(), request.getPosition(), request.getFontSize(),
+                null);
 
         if (!success) {
             logger.error("Erro ao processar overlay no vídeo.");
@@ -125,7 +133,13 @@ public class VideoOverlayService {
         videoOverlay.setOverlayPosition(request.getPosition());
         videoOverlay.setOverlayFontSize(request.getFontSize());
 
-        return videoOverlayRepository.save(videoOverlay);
+        // Salva primeiro para obter o ID
+        videoOverlay = videoOverlayRepository.save(videoOverlay);
+
+        // Envia a mensagem para o RabbitMQ após o salvamento
+        videoOverlayProducer.sendVideoOverlayMessage(videoOverlay.getId().toString());
+
+        return videoOverlay;
     }
 
     // Remove arquivos temporários após a consolidação final

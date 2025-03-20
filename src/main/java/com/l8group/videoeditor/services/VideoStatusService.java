@@ -1,6 +1,7 @@
 package com.l8group.videoeditor.services;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -41,7 +42,7 @@ public class VideoStatusService {
 
     private <T> void updateStatusAndTimestamp(T entity, VideoStatusEnum status) throws Exception {
         Method setStatusMethod = findMethod(entity.getClass(), "setStatus", VideoStatusEnum.class);
-        Method setUpdatedAtMethod = findMethod(entity.getClass(), "setUpdatedAt", ZonedDateTime.class);
+        Method setUpdatedAtMethod = findMethod(entity.getClass(), "setUpdatedTimes", ZonedDateTime.class);
 
         if (setStatusMethod != null && setUpdatedAtMethod != null) {
             setStatusMethod.invoke(entity, status);

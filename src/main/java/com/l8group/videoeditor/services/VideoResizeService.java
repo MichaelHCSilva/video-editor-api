@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoResize;
+import com.l8group.videoeditor.rabbit.producer.VideoResizeProducer;
 import com.l8group.videoeditor.repositories.VideoResizeRepository;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
@@ -32,10 +33,12 @@ public class VideoResizeService {
 
     private final VideoFileRepository videoFileRepository;
     private final VideoResizeRepository videoResizeRepository;
+    private final VideoResizeProducer videoResizeProducer;
 
-    public VideoResizeService(VideoFileRepository videoFileRepository, VideoResizeRepository videoResizeRepository) {
+    public VideoResizeService(VideoFileRepository videoFileRepository, VideoResizeRepository videoResizeRepository, VideoResizeProducer videoResizeProducer) {
         this.videoFileRepository = videoFileRepository;
         this.videoResizeRepository = videoResizeRepository;
+        this.videoResizeProducer = videoResizeProducer;
     }
 
     @Transactional
@@ -107,6 +110,8 @@ public class VideoResizeService {
 
         videoResize = videoResizeRepository.save(videoResize);
         logger.info("Registro de redimensionamento salvo no banco de dados. ID={}", videoResize.getId());
+
+        videoResizeProducer.sendMessage(videoResize.getId().toString());
 
         return outputFilePath;
     }

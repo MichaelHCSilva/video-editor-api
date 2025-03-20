@@ -19,6 +19,7 @@ import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.NoVideosFoundException;
 import com.l8group.videoeditor.models.VideoFile;
+import com.l8group.videoeditor.rabbit.producer.VideoProcessingProducer;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
 
@@ -29,9 +30,11 @@ public class VideoFileService {
     private String STORAGE_DIR;
 
     private final VideoFileRepository videoFileRepository;
+    private final VideoProcessingProducer videoProcessingProducer;
 
-    public VideoFileService(VideoFileRepository videoFileRepository) {
+    public VideoFileService(VideoFileRepository videoFileRepository, VideoProcessingProducer videoProcessingProducer) {
         this.videoFileRepository = videoFileRepository;
+        this.videoProcessingProducer = videoProcessingProducer;
     }
 
     public VideoFileResponseDTO uploadVideo(MultipartFile file) throws IOException {
@@ -80,6 +83,8 @@ public class VideoFileService {
         videoFile.setVideoDuration(duration);
 
         videoFile = videoFileRepository.save(videoFile);
+
+        videoProcessingProducer.sendVideoId(videoFile.getId());
 
         return new VideoFileResponseDTO(videoFile.getId(), videoFile.getVideoFileName(), videoFile.getCreatedTimes());
 

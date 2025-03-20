@@ -20,16 +20,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
-import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.models.VideoFile;
+import com.l8group.videoeditor.models.VideoProcessingBatch;
+import com.l8group.videoeditor.rabbit.producer.VideoBatchProducer;
 import com.l8group.videoeditor.repositories.VideoBatchProcessRepository;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoBatchRequest;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoUtils;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoBatchService {
@@ -40,6 +41,7 @@ public class VideoBatchService {
     private final VideoResizeService videoResizeService;
     private final VideoOverlayService videoOverlayService;
     private final VideoConversionService videoConversionService;
+    private final VideoBatchProducer videoBatchProducer;
 
     private static final Logger logger = LoggerFactory.getLogger(VideoBatchService.class);
 
@@ -53,13 +55,14 @@ public class VideoBatchService {
     public VideoBatchService(VideoFileRepository videoFileRepository,
             VideoBatchProcessRepository videoBatchProcessRepository,
             VideoCutService videoCutService, VideoResizeService videoResizeService,
-            VideoOverlayService videoOverlayService, VideoConversionService videoConversionService) {
+            VideoOverlayService videoOverlayService, VideoConversionService videoConversionService, VideoBatchProducer videoBatchProducer) {
         this.videoFileRepository = videoFileRepository;
         this.videoBatchProcessRepository = videoBatchProcessRepository;
         this.videoCutService = videoCutService;
         this.videoResizeService = videoResizeService;
         this.videoOverlayService = videoOverlayService;
         this.videoConversionService = videoConversionService;
+        this.videoBatchProducer = videoBatchProducer;
     }
 
     @Transactional
@@ -137,6 +140,8 @@ public class VideoBatchService {
 
             VideoProcessingBatch batchProcess = createAndSaveBatchProcess(originalVideoFile, request.getOperations(),
                     finalOutputFileName);
+
+            videoBatchProducer.sendVideoBatchId(batchProcess.getId());
 
             logger.info("✅ [processBatch] Processamento concluído | Vídeo ID: {} | Arquivo final: {}",
                     originalVideoFile.getId(), finalOutputPath);
