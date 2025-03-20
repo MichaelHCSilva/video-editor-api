@@ -11,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
@@ -42,7 +43,7 @@ public class VideoCutService {
         this.videoCutProducer = videoCutProducer;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String cutVideo(VideoCutRequest request, String previousFilePath) {
         logger.info("Iniciando corte do vídeo. videoId={}, startTime={}, endTime={}, previousFilePath={}",
                 request.getVideoId(), request.getStartTime(), request.getEndTime(), previousFilePath);

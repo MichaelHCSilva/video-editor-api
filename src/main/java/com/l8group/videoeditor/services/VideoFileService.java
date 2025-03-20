@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.l8group.videoeditor.dtos.VideoFileListDTO;
@@ -22,6 +23,8 @@ import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoProcessingProducer;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
+
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class VideoFileService {
@@ -37,6 +40,7 @@ public class VideoFileService {
         this.videoProcessingProducer = videoProcessingProducer;
     }
 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public VideoFileResponseDTO uploadVideo(MultipartFile file) throws IOException {
         validateFileFormat(file);
 

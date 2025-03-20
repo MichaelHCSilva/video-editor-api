@@ -13,6 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
@@ -20,10 +21,10 @@ import com.l8group.videoeditor.models.VideoConversion;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoConversionProducer;
 import com.l8group.videoeditor.repositories.VideoConversionRepository;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoConversionService {
@@ -44,7 +45,7 @@ public class VideoConversionService {
         this.videoConversionProducer = videoConversionProducer;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW) 
     public String convertVideo(VideoConversionRequest request, String previousFilePath) {
         logger.info("Iniciando conversão de vídeo. videoId={}, outputFormat={}, previousFilePath={}",
                 request.getVideoId(), request.getOutputFormat(), previousFilePath);

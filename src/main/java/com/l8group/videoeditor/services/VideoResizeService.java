@@ -10,18 +10,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.rabbit.producer.VideoResizeProducer;
+import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.repositories.VideoResizeRepository;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoResolutionsUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 
 @Service
 public class VideoResizeService {
@@ -41,7 +42,7 @@ public class VideoResizeService {
         this.videoResizeProducer = videoResizeProducer;
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String resizeVideo(VideoResizeRequest request, String previousFilePath) {
         logger.info("Iniciando redimensionamento do vídeo. videoId={}, width={}, height={}, previousFilePath={}",
                 request.getVideoId(), request.getWidth(), request.getHeight(), previousFilePath);
