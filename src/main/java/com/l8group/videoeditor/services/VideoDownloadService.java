@@ -15,8 +15,11 @@ import org.springframework.stereotype.Service;
 
 import com.l8group.videoeditor.exceptions.ProcessedFileNotFoundException;
 import com.l8group.videoeditor.exceptions.VideoProcessingNotFoundException;
+import com.l8group.videoeditor.metrics.VideoDownloadMetrics;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.repositories.VideoBatchProcessRepository;
+
+import io.micrometer.core.instrument.Timer;
 
 @Service
 public class VideoDownloadService {
@@ -27,15 +30,22 @@ public class VideoDownloadService {
     private String TEMP_DIR;
 
     private final VideoBatchProcessRepository videoBatchProcessRepository;
+    private final VideoDownloadMetrics videoDownloadMetrics;
 
-    public VideoDownloadService(VideoBatchProcessRepository videoBatchProcessRepository) {
+    public VideoDownloadService(VideoBatchProcessRepository videoBatchProcessRepository, VideoDownloadMetrics videoDownloadMetrics) {
         this.videoBatchProcessRepository = videoBatchProcessRepository;
+        this.videoDownloadMetrics = videoDownloadMetrics;
     }
 
     public Resource getProcessedVideo(UUID batchProcessId) {
+        videoDownloadMetrics.incrementDownloadRequests(); // Incrementa o total de solicitações
+
+        Timer.Sample downloadTimer = videoDownloadMetrics.startDownloadTimer(); // Inicia a medição do tempo
+
         VideoProcessingBatch batchProcess = videoBatchProcessRepository.findById(batchProcessId)
                 .orElseThrow(() -> {
                     logger.error("Processamento em lote {} não encontrado.", batchProcessId);
+                    videoDownloadMetrics.incrementFailedDownloads(); // Incrementa falha
                     return new VideoProcessingNotFoundException("Processamento em lote não encontrado.");
                 });
 
@@ -45,8 +55,14 @@ public class VideoDownloadService {
 
         if (!file.exists()) {
             logger.error("Arquivo processado não encontrado: {}", processedFileName);
+            videoDownloadMetrics.incrementFailedDownloads(); // Incrementa falha
             throw new ProcessedFileNotFoundException("Arquivo processado não encontrado.");
         }
+
+        long fileSize = file.length(); // Obtém o tamanho do arquivo baixado
+        videoDownloadMetrics.addDownloadedFileSize(fileSize); // Registra o tamanho total dos arquivos baixados
+        videoDownloadMetrics.incrementSuccessfulDownloads(); // Incrementa sucesso
+        videoDownloadMetrics.recordDownloadDuration(downloadTimer); // Registra o tempo de download
 
         logger.info("Download realizado com sucesso: {}", processedFileName);
         return new FileSystemResource(file);

@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.metrics.VideoConversionServiceMetrics;
 import com.l8group.videoeditor.models.VideoConversion;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoConversionProducer;
@@ -26,6 +27,8 @@ import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
 
+import io.micrometer.core.instrument.Timer;
+
 @Service
 public class VideoConversionService {
 
@@ -34,19 +37,28 @@ public class VideoConversionService {
     private final VideoFileRepository videoFileRepository;
     private final VideoConversionRepository videoConversionRepository;
     private final VideoConversionProducer videoConversionProducer;
+    private final VideoConversionServiceMetrics videoConversionServiceMetrics;
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
     public VideoConversionService(VideoFileRepository videoFileRepository, VideoConversionRepository videoConversionRepository,
-                                  VideoConversionProducer videoConversionProducer) {
+                                  VideoConversionProducer videoConversionProducer, VideoConversionServiceMetrics videoConversionServiceMetrics) {
         this.videoFileRepository = videoFileRepository;
         this.videoConversionRepository = videoConversionRepository;
         this.videoConversionProducer = videoConversionProducer;
+        this.videoConversionServiceMetrics = videoConversionServiceMetrics;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW) 
     public String convertVideo(VideoConversionRequest request, String previousFilePath) {
+
+        videoConversionServiceMetrics.incrementConversionRequests(); // Incrementa solicitações de conversão
+        videoConversionServiceMetrics.incrementProcessingQueueSize(); // Incrementa a fila de processamento
+
+        Timer.Sample timer = videoConversionServiceMetrics.startConversionTimer(); // Inicia o temporizador
+
+
         logger.info("Iniciando conversão de vídeo. videoId={}, outputFormat={}, previousFilePath={}",
                 request.getVideoId(), request.getOutputFormat(), previousFilePath);
 
@@ -57,6 +69,8 @@ public class VideoConversionService {
         VideoFile videoFile = videoFileRepository.findById(videoId)
                 .orElseThrow(() -> {
                     logger.error("Vídeo não encontrado para o ID: {}", videoId);
+                    videoConversionServiceMetrics.incrementConversionFailure(); // Incrementa falha
+                    videoConversionServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
                     return new RuntimeException("Vídeo não encontrado para o ID: " + videoId);
                 });
 
@@ -73,6 +87,8 @@ public class VideoConversionService {
         File inputFile = new File(inputFilePath);
         if (!inputFile.exists()) {
             logger.error("Arquivo de entrada não encontrado: {}", inputFilePath);
+            videoConversionServiceMetrics.incrementConversionFailure(); // Incrementa falha
+            videoConversionServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
             throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
@@ -96,9 +112,16 @@ public class VideoConversionService {
 
         if (!success) {
             logger.error("Falha ao converter o vídeo para o formato {}", outputFormat);
+            videoConversionServiceMetrics.incrementConversionFailure(); // Incrementa falha
+            videoConversionServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
             throw new RuntimeException("Falha ao converter o vídeo para o formato " + outputFormat);
         }
-        logger.info("Conversão concluída com sucesso.");
+        long fileSize = new File(outputFilePath).length();
+        videoConversionServiceMetrics.setConvertedFileSize(fileSize); // Define o tamanho do arquivo convertido
+
+        videoConversionServiceMetrics.recordConversionDuration(timer); // Registra a duração da conversão
+        videoConversionServiceMetrics.incrementConversionSuccess(); // Incrementa sucesso
+        videoConversionServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
 
         // Salva as informações da conversão no banco de dados
         VideoConversion videoConversion = createAndSaveVideoConversion(videoFile, outputFormat);

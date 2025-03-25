@@ -14,16 +14,11 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/").permitAll()  
-                .requestMatchers("/api/videos").permitAll()
-                .requestMatchers("/api/videos/upload").permitAll()
-                .requestMatchers("/api/videos/edit/cut").permitAll()
-                .requestMatchers("/api/videos/edit/resize").permitAll()
-                .requestMatchers("/api/videos/edit/overlay-text").permitAll()
-                .requestMatchers("/api/videos/batch-process").permitAll()
-                .requestMatchers("/api/videos/convert").permitAll()
-                .requestMatchers("/api/videos/download/{videoId}").permitAll()
-                .requestMatchers("/error").permitAll() 
-                .anyRequest().authenticated()  
+                .requestMatchers("/api/videos/**").permitAll()
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/actuator/prometheus").permitAll() 
+                .requestMatchers("/favicon.ico").permitAll()
+                .anyRequest().authenticated() 
             );
         return http.build();
     }

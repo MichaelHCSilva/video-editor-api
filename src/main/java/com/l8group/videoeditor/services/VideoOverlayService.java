@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.metrics.VideoOverlayServiceMetrics;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoOverlay;
 import com.l8group.videoeditor.rabbit.producer.VideoOverlayProducer;
@@ -34,20 +35,24 @@ public class VideoOverlayService {
     private final VideoFileRepository videoFileRepository;
     private final VideoOverlayRepository videoOverlayRepository;
     private final VideoOverlayProducer videoOverlayProducer;
+    private final VideoOverlayServiceMetrics videoOverlayServiceMetrics;
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
     public VideoOverlayService(VideoFileRepository videoFileRepository,
-            VideoOverlayRepository videoOverlayRepository, VideoOverlayProducer videoOverlayProducer) {
+            VideoOverlayRepository videoOverlayRepository, VideoOverlayProducer videoOverlayProducer,
+            VideoOverlayServiceMetrics videoOverlayServiceMetrics) {
         this.videoFileRepository = videoFileRepository;
         this.videoOverlayRepository = videoOverlayRepository;
         this.videoOverlayProducer = videoOverlayProducer;
+        this.videoOverlayServiceMetrics = videoOverlayServiceMetrics;
 
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String processOverlay(VideoOverlayRequest request, String previousFilePath) {
+        videoOverlayServiceMetrics.incrementOverlayRequests(); // Incrementa a métrica de requisições de overlay
         logger.info(
                 "Iniciando overlay no vídeo. videoId={}, watermark={}, position={}, fontSize={}, previousFilePath={}",
                 request.getVideoId(), request.getWatermark(), request.getPosition(), request.getFontSize(),
@@ -59,6 +64,7 @@ public class VideoOverlayService {
         VideoFile videoFile = videoFileRepository.findById(videoId)
                 .orElseThrow(() -> {
                     logger.error("Vídeo não encontrado para o ID: {}", videoId);
+                    videoOverlayServiceMetrics.incrementOverlayFailure(); // Incrementa falha
                     return new RuntimeException("Vídeo não encontrado para o ID: " + videoId);
                 });
 
@@ -75,6 +81,7 @@ public class VideoOverlayService {
         File inputFile = new File(inputFilePath);
         if (!inputFile.exists()) {
             logger.error("Arquivo de entrada não encontrado: {}", inputFilePath);
+            videoOverlayServiceMetrics.incrementOverlayFailure(); // Incrementa falha
             throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
@@ -92,6 +99,9 @@ public class VideoOverlayService {
         // Garante que o diretório temporário existe
         createTempDirectory();
 
+        // Inicia o temporizador
+        var timerSample = videoOverlayServiceMetrics.startOverlayProcessingTimer();
+
         // Processa o overlay
         logger.info("Iniciando processamento do overlay: {} → {}", inputFilePath, outputFilePath);
         boolean success = VideoOverlayUtils.applyTextOverlayWithFFmpeg(
@@ -100,12 +110,25 @@ public class VideoOverlayService {
 
         if (!success) {
             logger.error("Erro ao processar overlay no vídeo.");
+            videoOverlayServiceMetrics.incrementOverlayFailure(); // Incrementa falha
+            videoOverlayServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
             throw new RuntimeException("Erro ao processar overlay no vídeo.");
         }
+
+        // Registra a duração do processo
+        videoOverlayServiceMetrics.recordOverlayProcessingDuration(timerSample);
+        videoOverlayServiceMetrics.incrementOverlaySuccess();
+
         logger.info("Overlay aplicado com sucesso.");
 
-        // Salva os dados do overlay no banco de dados
+        // Obtém o tamanho do arquivo gerado e atualiza a métrica
+        long fileSize = new File(outputFilePath).length();
+        videoOverlayServiceMetrics.setOverlayFileSize(fileSize);
+        logger.info("Tamanho do arquivo com overlay: {} bytes", fileSize);
+
         VideoOverlay videoOverlay = createAndSaveVideoOverlay(videoFile, request);
+        videoOverlayServiceMetrics.decrementProcessingQueueSize(); // Remove da fila após sucesso
+
         logger.info("Registro de overlay salvo no banco de dados. ID={}", videoOverlay.getId());
 
         return outputFilePath;

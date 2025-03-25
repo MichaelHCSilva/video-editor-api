@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.metrics.VideoBatchServiceMetrics;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.rabbit.producer.VideoBatchProducer;
@@ -33,6 +34,8 @@ import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoUtils;
 
+import io.micrometer.core.instrument.Timer;
+
 @Service
 public class VideoBatchService {
 
@@ -43,6 +46,7 @@ public class VideoBatchService {
     private final VideoOverlayService videoOverlayService;
     private final VideoConversionService videoConversionService;
     private final VideoBatchProducer videoBatchProducer;
+    private final VideoBatchServiceMetrics videoBatchServiceMetrics;
 
     private static final Logger logger = LoggerFactory.getLogger(VideoBatchService.class);
 
@@ -56,7 +60,8 @@ public class VideoBatchService {
     public VideoBatchService(VideoFileRepository videoFileRepository,
             VideoBatchProcessRepository videoBatchProcessRepository,
             VideoCutService videoCutService, VideoResizeService videoResizeService,
-            VideoOverlayService videoOverlayService, VideoConversionService videoConversionService, VideoBatchProducer videoBatchProducer) {
+            VideoOverlayService videoOverlayService, VideoConversionService videoConversionService,
+            VideoBatchProducer videoBatchProducer, VideoBatchServiceMetrics videoBatchServiceMetrics) {
         this.videoFileRepository = videoFileRepository;
         this.videoBatchProcessRepository = videoBatchProcessRepository;
         this.videoCutService = videoCutService;
@@ -64,12 +69,18 @@ public class VideoBatchService {
         this.videoOverlayService = videoOverlayService;
         this.videoConversionService = videoConversionService;
         this.videoBatchProducer = videoBatchProducer;
+        this.videoBatchServiceMetrics = videoBatchServiceMetrics;
     }
 
     @Transactional
     public VideoBatchResponseDTO processBatch(VideoBatchRequest request) {
         logger.info("🟢 [processBatch] Iniciando processamento em lote | Vídeos: {} | Operações: {}",
                 request.getVideoIds(), request.getOperations());
+
+        videoBatchServiceMetrics.incrementBatchRequests(); // ⬅️ Registra uma nova solicitação
+        videoBatchServiceMetrics.incrementProcessingQueueSize(); // ⬅️ Incrementa a fila de processamento
+
+        Timer.Sample timerSample = videoBatchServiceMetrics.startBatchProcessingTimer(); // ⬅️ Inicia a medição do tempo
 
         List<String> intermediateFiles = new ArrayList<>();
 
@@ -120,6 +131,7 @@ public class VideoBatchService {
 
                 } catch (Exception e) {
                     logger.error("❌ [processBatch] Erro ao processar operação: {}", operation.getOperationType(), e);
+                    videoBatchServiceMetrics.incrementBatchFailure(); // ⬅️ Incrementa falhas
                     throw new RuntimeException("Falha ao processar operação.", e);
                 }
             }
@@ -144,6 +156,13 @@ public class VideoBatchService {
 
             videoBatchProducer.sendVideoBatchId(batchProcess.getId());
 
+            videoBatchServiceMetrics.recordBatchProcessingDuration(timerSample); // ⬅️ Registra o tempo de processamento
+            videoBatchServiceMetrics.incrementBatchSuccess(); // ⬅️ Incrementa sucessos
+            videoBatchServiceMetrics.decrementProcessingQueueSize(); // ⬅️ Decrementa a fila de processamento
+
+            long processedFileSize = new File(finalOutputPath).length();
+            videoBatchServiceMetrics.setProcessedFileSize(processedFileSize); // ⬅️ Define o tamanho do arquivo final
+
             logger.info("✅ [processBatch] Processamento concluído | Vídeo ID: {} | Arquivo final: {}",
                     originalVideoFile.getId(), finalOutputPath);
 
@@ -155,6 +174,9 @@ public class VideoBatchService {
 
         } catch (Exception e) {
             logger.error("❌ [processBatch] Erro geral durante o processamento do lote", e);
+            videoBatchServiceMetrics.incrementBatchFailure(); // ⬅️ Incrementa falhas
+            videoBatchServiceMetrics.decrementProcessingQueueSize(); // ⬅️ Decrementa a fila de processamento em caso de
+                                                                     // erro
             throw new RuntimeException("Erro geral no processamento do lote.", e);
         }
     }

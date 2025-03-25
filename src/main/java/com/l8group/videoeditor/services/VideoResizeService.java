@@ -1,6 +1,7 @@
 package com.l8group.videoeditor.services;
 
 import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.time.ZonedDateTime;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.metrics.VideoResizeServiceMetrics;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.rabbit.producer.VideoResizeProducer;
@@ -23,6 +25,8 @@ import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoResolutionsUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
+
+import io.micrometer.core.instrument.Timer;
 
 @Service
 public class VideoResizeService {
@@ -35,17 +39,25 @@ public class VideoResizeService {
     private final VideoFileRepository videoFileRepository;
     private final VideoResizeRepository videoResizeRepository;
     private final VideoResizeProducer videoResizeProducer;
+    private final VideoResizeServiceMetrics videoResizeServiceMetrics;
 
-    public VideoResizeService(VideoFileRepository videoFileRepository, VideoResizeRepository videoResizeRepository, VideoResizeProducer videoResizeProducer) {
+    public VideoResizeService(VideoFileRepository videoFileRepository, VideoResizeRepository videoResizeRepository,
+            VideoResizeProducer videoResizeProducer, VideoResizeServiceMetrics videoResizeServiceMetrics) {
         this.videoFileRepository = videoFileRepository;
         this.videoResizeRepository = videoResizeRepository;
         this.videoResizeProducer = videoResizeProducer;
+        this.videoResizeServiceMetrics = videoResizeServiceMetrics;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String resizeVideo(VideoResizeRequest request, String previousFilePath) {
         logger.info("Iniciando redimensionamento do vídeo. videoId={}, width={}, height={}, previousFilePath={}",
                 request.getVideoId(), request.getWidth(), request.getHeight(), previousFilePath);
+
+        videoResizeServiceMetrics.incrementResizeRequests();
+        videoResizeServiceMetrics.incrementProcessingQueueSize();
+
+        Timer.Sample sample = videoResizeServiceMetrics.startResizeTimer();
 
         UUID videoId = UUID.fromString(request.getVideoId());
 
@@ -57,6 +69,7 @@ public class VideoResizeService {
         // Valida a resolução do vídeo
         if (!VideoResolutionsUtils.isValidResolution(request.getWidth(), request.getHeight())) {
             logger.error("Resolução não suportada: {}x{}", request.getWidth(), request.getHeight());
+            videoResizeServiceMetrics.incrementResizeFailure();
             throw new IllegalArgumentException(
                     "Resolução não suportada: " + request.getWidth() + "x" + request.getHeight());
         }
@@ -64,7 +77,7 @@ public class VideoResizeService {
         // Determina qual arquivo usar como entrada
         String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
                 ? previousFilePath
-                : videoFile.getVideoFilePath(); 
+                : videoFile.getVideoFilePath();
 
         logger.info("Arquivo de entrada definido como: {}", inputFilePath);
 
@@ -72,6 +85,7 @@ public class VideoResizeService {
         File inputFile = new File(inputFilePath);
         if (!inputFile.exists()) {
             logger.error("Arquivo de entrada não encontrado: {}", inputFilePath);
+            videoResizeServiceMetrics.incrementResizeFailure();
             throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
@@ -97,9 +111,22 @@ public class VideoResizeService {
 
         if (!success) {
             logger.error("Falha ao processar o redimensionamento do vídeo.");
+            videoResizeServiceMetrics.incrementResizeFailure();
             throw new RuntimeException("Falha ao processar o redimensionamento do vídeo.");
         }
         logger.info("Redimensionamento concluído com sucesso.");
+        videoResizeServiceMetrics.incrementResizeSuccess();
+
+        try {
+            long fileSize = Files.size(Paths.get(outputFilePath));
+            videoResizeServiceMetrics.setResizeFileSize(fileSize);
+            logger.info("Tamanho do arquivo redimensionado: {} bytes", fileSize);
+        } catch (Exception e) {
+            logger.error("Erro ao obter tamanho do arquivo redimensionado: {}", e.getMessage());
+        }
+
+        // Registra a duração do redimensionamento
+        videoResizeServiceMetrics.recordResizeDuration(sample);
 
         // Salva os dados no banco de dados
         VideoResize videoResize = new VideoResize();
@@ -113,6 +140,8 @@ public class VideoResizeService {
         logger.info("Registro de redimensionamento salvo no banco de dados. ID={}", videoResize.getId());
 
         videoResizeProducer.sendMessage(videoResize.getId().toString());
+
+        videoResizeServiceMetrics.decrementProcessingQueueSize();
 
         return outputFilePath;
     }

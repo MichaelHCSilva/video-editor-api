@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s  # Tempo de coleta dos dados
+
+scrape_configs:
+  - job_name: 'video-editor-api'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['172.17.0.1:8080']

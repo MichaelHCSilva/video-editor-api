@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.metrics.VideoCutServiceMetrics;
 import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoCutProducer;
@@ -24,6 +25,8 @@ import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.utils.VideoUtils;
+
+import io.micrometer.core.instrument.Timer;
 
 @Service
 public class VideoCutService {
@@ -36,17 +39,23 @@ public class VideoCutService {
     private final VideoFileRepository videoFileRepository;
     private final VideoCutRepository videoCutRepository;
     private final VideoCutProducer videoCutProducer;
+    private final VideoCutServiceMetrics videoCutServiceMetrics;
 
-    public VideoCutService(VideoFileRepository videoFileRepository, VideoCutRepository videoCutRepository, VideoCutProducer videoCutProducer) {
+    public VideoCutService(VideoFileRepository videoFileRepository, VideoCutRepository videoCutRepository, VideoCutProducer videoCutProducer, VideoCutServiceMetrics videoCutServiceMetrics) {
         this.videoFileRepository = videoFileRepository;
         this.videoCutRepository = videoCutRepository;
         this.videoCutProducer = videoCutProducer;
+        this.videoCutServiceMetrics = videoCutServiceMetrics;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String cutVideo(VideoCutRequest request, String previousFilePath) {
         logger.info("Iniciando corte do vídeo. videoId={}, startTime={}, endTime={}, previousFilePath={}",
                 request.getVideoId(), request.getStartTime(), request.getEndTime(), previousFilePath);
+
+        videoCutServiceMetrics.incrementCutRequests();
+
+
         UUID videoId = UUID.fromString(request.getVideoId());
 
         // Verifica se o vídeo existe no banco
@@ -66,6 +75,7 @@ public class VideoCutService {
         File inputFile = new File(inputFilePath);
         if (!inputFile.exists()) {
             logger.error("Arquivo de entrada não encontrado: {}", inputFilePath);
+            videoCutServiceMetrics.incrementCutFailure();
             throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
         }
 
@@ -89,6 +99,9 @@ public class VideoCutService {
 
         logger.info("Tempo de corte convertido: start={}s, end={}s", startTime, endTime);
 
+        videoCutServiceMetrics.incrementProcessingQueueSize(); // 🔹 Adiciona à fila
+        Timer.Sample timerSample = videoCutServiceMetrics.startCutTimer(); // 🔹 Inicia o timer
+
         // Realiza o corte do vídeo
         logger.info("Iniciando corte do vídeo: {} → {}", inputFilePath, outputFilePath);
         boolean success = VideoProcessorUtils.cutVideo(inputFilePath, outputFilePath, request.getStartTime(),
@@ -96,9 +109,21 @@ public class VideoCutService {
 
         if (!success) {
             logger.error("Falha ao processar o corte do vídeo.");
+            videoCutServiceMetrics.incrementCutFailure(); // 🔹 Incrementa falhas
+            videoCutServiceMetrics.decrementProcessingQueueSize(); // 🔹 Remove da fila
             throw new RuntimeException("Falha ao processar o corte do vídeo.");
         }
+
+        videoCutServiceMetrics.incrementCutSuccess(); // 🔹 Incrementa sucesso
+        videoCutServiceMetrics.recordCutDuration(timerSample); // 🔹 Registra duração do corte
+
+        File outputFile = new File(outputFilePath);
+        if (outputFile.exists()) {
+            videoCutServiceMetrics.setCutFileSize(outputFile.length()); // 🔹 Atualiza métrica de tamanho
+        }
+
         logger.info("Corte concluído com sucesso.");
+        videoCutServiceMetrics.decrementProcessingQueueSize(); // 🔹 Remove da fila
 
         // Calcula a duração do corte
         int cutDuration = endTime - startTime;
