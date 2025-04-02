@@ -4,6 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.UUID;
@@ -38,33 +42,74 @@ public class VideoDownloadService {
     }
 
     public Resource getProcessedVideo(UUID batchProcessId) {
-        videoDownloadMetrics.incrementDownloadRequests(); // Incrementa o total de solicitações
+        videoDownloadMetrics.incrementDownloadRequests();
 
-        Timer.Sample downloadTimer = videoDownloadMetrics.startDownloadTimer(); // Inicia a medição do tempo
+        Timer.Sample downloadTimer = videoDownloadMetrics.startDownloadTimer();
 
         VideoProcessingBatch batchProcess = videoBatchProcessRepository.findById(batchProcessId)
                 .orElseThrow(() -> {
                     logger.error("Processamento em lote {} não encontrado.", batchProcessId);
-                    videoDownloadMetrics.incrementFailedDownloads(); // Incrementa falha
+                    videoDownloadMetrics.incrementFailedDownloads();
                     return new VideoProcessingNotFoundException("Processamento em lote não encontrado.");
                 });
 
-        String processedFileName = batchProcess.getVideoOutputFileName();
-        Path processedFilePath = Paths.get(TEMP_DIR, processedFileName);
-        File file = processedFilePath.toFile();
+        String videoFilePath = batchProcess.getVideoFilePath();
+
+        try {
+            // Verifica se o caminho é um URL (S3) ou um caminho local
+            if (videoFilePath.startsWith("http://") || videoFilePath.startsWith("https://")) {
+                return downloadFromS3(videoFilePath, batchProcess.getId());
+            } else {
+                return downloadFromLocal(videoFilePath);
+            }
+        } catch (IOException e) {
+            logger.error("Erro ao baixar o arquivo processado.", e);
+            videoDownloadMetrics.incrementFailedDownloads();
+            throw new ProcessedFileNotFoundException("Erro ao baixar o arquivo processado.");
+        } finally {
+            videoDownloadMetrics.recordDownloadDuration(downloadTimer);
+        }
+    }
+
+    private Resource downloadFromLocal(String localFilePath) {
+        Path filePath = Paths.get(localFilePath);
+        File file = filePath.toFile();
 
         if (!file.exists()) {
-            logger.error("Arquivo processado não encontrado: {}", processedFileName);
-            videoDownloadMetrics.incrementFailedDownloads(); // Incrementa falha
+            logger.error("Arquivo processado não encontrado: {}", localFilePath);
+            videoDownloadMetrics.incrementFailedDownloads();
             throw new ProcessedFileNotFoundException("Arquivo processado não encontrado.");
         }
 
-        long fileSize = file.length(); // Obtém o tamanho do arquivo baixado
-        videoDownloadMetrics.addDownloadedFileSize(fileSize); // Registra o tamanho total dos arquivos baixados
-        videoDownloadMetrics.incrementSuccessfulDownloads(); // Incrementa sucesso
-        videoDownloadMetrics.recordDownloadDuration(downloadTimer); // Registra o tempo de download
+        long fileSize = file.length();
+        videoDownloadMetrics.addDownloadedFileSize(fileSize);
+        videoDownloadMetrics.incrementSuccessfulDownloads();
 
-        logger.info("Download realizado com sucesso: {}", processedFileName);
+        logger.info("Download realizado com sucesso: {}", localFilePath);
         return new FileSystemResource(file);
+    }
+
+    private Resource downloadFromS3(String s3Url, UUID batchProcessId) throws IOException {
+        URL url = new URL(s3Url);
+        String tempFileName = batchProcessId + "_" + Paths.get(url.getPath()).getFileName().toString();
+        Path tempFilePath = Paths.get(TEMP_DIR, tempFileName);
+        File tempFile = tempFilePath.toFile();
+
+        try (InputStream in = url.openStream();
+             FileOutputStream out = new FileOutputStream(tempFile)) {
+
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = in.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+        }
+
+        long fileSize = tempFile.length();
+        videoDownloadMetrics.addDownloadedFileSize(fileSize);
+        videoDownloadMetrics.incrementSuccessfulDownloads();
+
+        logger.info("Download realizado com sucesso do S3: {}", s3Url);
+        return new FileSystemResource(tempFile);
     }
 }

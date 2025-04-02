@@ -40,13 +40,17 @@ public class VideoResizeService {
     private final VideoResizeRepository videoResizeRepository;
     private final VideoResizeProducer videoResizeProducer;
     private final VideoResizeServiceMetrics videoResizeServiceMetrics;
+    private final VideoStatusManagerService videoStatusManagerService; // Adicionado
 
     public VideoResizeService(VideoFileRepository videoFileRepository, VideoResizeRepository videoResizeRepository,
-            VideoResizeProducer videoResizeProducer, VideoResizeServiceMetrics videoResizeServiceMetrics) {
+            VideoResizeProducer videoResizeProducer, VideoResizeServiceMetrics videoResizeServiceMetrics,
+            VideoStatusManagerService videoStatusManagerService) {
         this.videoFileRepository = videoFileRepository;
         this.videoResizeRepository = videoResizeRepository;
         this.videoResizeProducer = videoResizeProducer;
         this.videoResizeServiceMetrics = videoResizeServiceMetrics;
+        this.videoStatusManagerService = videoStatusManagerService; // Adicionado
+
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -142,6 +146,10 @@ public class VideoResizeService {
         videoResizeProducer.sendMessage(videoResize.getId().toString());
 
         videoResizeServiceMetrics.decrementProcessingQueueSize();
+
+        // Atualizar o status do VideoResize após o envio para o RabbitMQ e outras operações
+        videoStatusManagerService.updateEntityStatus(videoResizeRepository, videoResize.getId(),
+                VideoStatusEnum.COMPLETED, "VideoResizeService - Conclusão");
 
         return outputFilePath;
     }

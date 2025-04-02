@@ -1,4 +1,4 @@
-package com.l8group.videoeditor.services;
+/*package com.l8group.videoeditor.services;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 
@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.time.ZonedDateTime;
 import java.util.Optional;
@@ -19,23 +20,26 @@ public class VideoStatusService {
     private static final Logger logger = LoggerFactory.getLogger(VideoStatusService.class);
 
     @Transactional
-    public <T> void updateVideoStatus(JpaRepository<T, UUID> repository, UUID entityId, VideoStatusEnum status) {
+    public <T> void updateVideoStatus(JpaRepository<T, UUID> repository, UUID entityId, VideoStatusEnum status, String errorSource) {
         Optional<T> entityOptional = repository.findById(entityId);
         if (entityOptional.isPresent()) {
             T entity = entityOptional.get();
             try {
                 updateStatusAndTimestamp(entity, status);
                 repository.save(entity);
-                logger.info("Status atualizado para {} na entidade com ID: {}", status, entityId);
+                logger.info("Status atualizado para {} na entidade com ID: {}. Origem: {}", status, entityId, errorSource);
             } catch (NoSuchMethodException e) {
-                logger.error("Métodos setStatus ou setUpdatedAt não encontrados na entidade com ID: {}", entityId, e);
+                logger.error("Métodos setStatus ou setUpdatedAt não encontrados na entidade com ID: {}. Origem: {}", entityId, errorSource, e);
                 throw new RuntimeException("Métodos setStatus ou setUpdatedAt não encontrados na entidade.", e);
+            } catch (InvocationTargetException e) {
+                logger.error("Erro ao invocar métodos setStatus ou setUpdatedAt na entidade com ID: {}. Origem: {}", entityId, errorSource, e);
+                throw new RuntimeException("Erro ao invocar métodos setStatus ou setUpdatedAt na entidade.", e);
             } catch (Exception e) {
-                logger.error("Erro ao atualizar status na entidade com ID: {}", entityId, e);
+                logger.error("Erro ao atualizar status na entidade com ID: {}. Origem: {}", entityId, errorSource, e);
                 throw new RuntimeException("Erro ao atualizar status na entidade.", e);
             }
         } else {
-            logger.warn("Nenhuma entidade encontrada com ID: {}", entityId);
+            logger.warn("Nenhuma entidade encontrada com ID: {}. Origem: {}", entityId, errorSource);
             throw new RuntimeException("Nenhuma entidade encontrada com ID: " + entityId);
         }
     }
@@ -59,4 +63,4 @@ public class VideoStatusService {
             return null;
         }
     }
-}
+}*/

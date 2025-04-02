@@ -38,13 +38,17 @@ public class VideoFileService {
     private final VideoFileRepository videoFileRepository;
     private final VideoProcessingProducer videoProcessingProducer;
     private final VideoFileServiceMetrics videoFileServiceMetrics;
+    private final S3Service s3Service;
+    private final VideoStatusManagerService videoStatusManagerService;
 
     public VideoFileService(VideoFileRepository videoFileRepository, VideoProcessingProducer videoProcessingProducer,
-            VideoFileServiceMetrics videoFileServiceMetrics) {
+            VideoFileServiceMetrics videoFileServiceMetrics, S3Service s3Service,
+            VideoStatusManagerService videoStatusManagerService) {
         this.videoFileRepository = videoFileRepository;
         this.videoProcessingProducer = videoProcessingProducer;
         this.videoFileServiceMetrics = videoFileServiceMetrics;
-        System.out.println("🚀 VideoFileServiceMetrics injetado com sucesso!");
+        this.s3Service = s3Service;
+        this.videoStatusManagerService = videoStatusManagerService;
 
     }
 
@@ -53,81 +57,79 @@ public class VideoFileService {
         videoFileServiceMetrics.incrementUploadRequests();
         Timer.Sample sample = videoFileServiceMetrics.startUploadTimer();
 
-        try {
-            validateFileFormat(file);
-            videoFileServiceMetrics.setFileSize(file.getSize());
+        validateFileFormat(file);
+        videoFileServiceMetrics.setFileSize(file.getSize());
 
-            // Obtém o nome original do arquivo
-            String originalFileName = file.getOriginalFilename();
-            if (originalFileName == null || originalFileName.isBlank()) {
-                throw new IllegalArgumentException("O arquivo deve ter um nome válido.");
-            }
-
-            // Garantir que o nome do arquivo seja seguro para armazenamento
-            String safeFileName = originalFileName.replaceAll("[^a-zA-Z0-9\\.\\-_]", "_");
-            String fileExtension = "";
-            int lastDotIndex = safeFileName.lastIndexOf(".");
-            if (lastDotIndex != -1) {
-                fileExtension = safeFileName.substring(lastDotIndex + 1); // Pega só a extensão (ex: "mp4", "avi",
-                                                                          // "mov")
-            }
-
-            // Caminho para armazenar o arquivo (mantém o nome original)
-            String filePath = STORAGE_DIR + File.separator + safeFileName;
-            // Criar diretório se não existir
-            File directory = new File(STORAGE_DIR);
-            if (!directory.exists() || !directory.isDirectory()) {
-                directory.mkdirs();
-            }
-
-            // Salvar o arquivo fisicamente
-            Path targetPath = Path.of(filePath);
-            Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
-
-            if (VideoValidationUtils.isVideoCorrupt(filePath)) {
-                videoFileServiceMetrics.incrementFileValidationErrors();
-                throw new IllegalArgumentException("O vídeo está corrompido e não pode ser processado.");
-            }
-
-            if (VideoValidationUtils.hasBlackFrames(filePath)) {
-                videoFileServiceMetrics.incrementFileValidationErrors();
-                throw new IllegalArgumentException("O vídeo contém quadros pretos indesejados.");
-            }
-
-            if (VideoValidationUtils.hasFrozenFrames(filePath)) {
-                videoFileServiceMetrics.incrementFileValidationErrors();
-                throw new IllegalArgumentException("O vídeo apresenta congelamentos.");
-            }
-
-            // Criar entidade e salvar no banco
-            VideoFile videoFile = new VideoFile();
-            videoFile.setVideoFileName(safeFileName);
-            videoFile.setVideoFileSize(file.getSize());
-            videoFile.setVideoFileFormat(fileExtension);
-            videoFile.setCreatedTimes(ZonedDateTime.now());
-            videoFile.setUpdatedTimes(ZonedDateTime.now());
-            videoFile.setStatus(VideoStatusEnum.PROCESSING);
-            videoFile.setVideoFilePath(filePath);
-
-            // 🔹 Obtém a duração do vídeo antes de salvar
-            String duration = VideoDurationUtils.getVideoDurationAsString(filePath);
-            videoFile.setVideoDuration(duration);
-
-            videoFile = videoFileRepository.save(videoFile);
-            videoProcessingProducer.sendVideoId(videoFile.getId());
-
-            videoFileServiceMetrics.incrementUploadSuccess();
-            return new VideoFileResponseDTO(videoFile.getId(), videoFile.getVideoFileName(),
-                    videoFile.getCreatedTimes());
-        } catch (Exception e) {
-            videoFileServiceMetrics.incrementUploadFailure(); // Registra falha no upload
-            if (e instanceof IOException) {
-                videoFileServiceMetrics.incrementFileStorageErrors(); // Registra erro de armazenamento
-            }
-            throw e;
-        } finally {
-            videoFileServiceMetrics.recordUploadDuration(sample); // Registra tempo total de upload
+        // Obtém o nome original do arquivo
+        String originalFileName = file.getOriginalFilename();
+        if (originalFileName == null || originalFileName.isBlank()) {
+            throw new IllegalArgumentException("O arquivo deve ter um nome válido.");
         }
+
+        // Gera um UUID de 8 dígitos e cria o novo nome do arquivo.
+        String uuid = UUID.randomUUID().toString().substring(0, 8);
+        String fileExtension = "";
+        int lastDotIndex = originalFileName.lastIndexOf(".");
+        if (lastDotIndex != -1) {
+            fileExtension = originalFileName.substring(lastDotIndex + 1);
+        }
+        String newFileName = originalFileName.substring(0, lastDotIndex) + "_" + uuid + "." + fileExtension;
+
+        // Caminho para armazenar o arquivo
+        String filePath = STORAGE_DIR + File.separator + newFileName;
+
+        // Criar diretório se não existir
+        File directory = new File(STORAGE_DIR);
+        if (!directory.exists() || !directory.isDirectory()) {
+            directory.mkdirs();
+        }
+
+        // Salvar o arquivo fisicamente
+        Path targetPath = Path.of(filePath);
+        Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
+
+        if (VideoValidationUtils.isVideoCorrupt(filePath)) {
+            videoFileServiceMetrics.incrementFileValidationErrors();
+            throw new IllegalArgumentException("O vídeo está corrompido e não pode ser processado.");
+        }
+
+        if (VideoValidationUtils.hasBlackFrames(filePath)) {
+            videoFileServiceMetrics.incrementFileValidationErrors();
+            throw new IllegalArgumentException("O vídeo contém quadros pretos indesejados.");
+        }
+
+        if (VideoValidationUtils.hasFrozenFrames(filePath)) {
+            videoFileServiceMetrics.incrementFileValidationErrors();
+            throw new IllegalArgumentException("O vídeo apresenta congelamentos.");
+        }
+
+        // Criar entidade e salvar no banco
+        VideoFile videoFile = new VideoFile();
+        videoFile.setVideoFileName(newFileName);
+        videoFile.setVideoFileSize(file.getSize());
+        videoFile.setVideoFileFormat(fileExtension);
+        videoFile.setCreatedTimes(ZonedDateTime.now());
+        videoFile.setUpdatedTimes(ZonedDateTime.now());
+        videoFile.setStatus(VideoStatusEnum.PROCESSING);
+        videoFile.setVideoFilePath(filePath);
+
+        // 🔹 Obtém a duração do vídeo antes de salvar
+        String duration = VideoDurationUtils.getVideoDurationAsString(filePath);
+        videoFile.setVideoDuration(duration);
+
+        videoFile = videoFileRepository.save(videoFile);
+        videoProcessingProducer.sendVideoId(videoFile.getId());
+
+        String s3Url = s3Service.uploadRawFile(new File(filePath), newFileName, videoFile.getId());
+        videoFile.setVideoFilePath(s3Url);
+        videoFileRepository.save(videoFile);
+
+        videoStatusManagerService.updateEntityStatus(videoFileRepository, videoFile.getId(), VideoStatusEnum.COMPLETED,
+                "FileUpload");
+
+        videoFileServiceMetrics.incrementUploadSuccess();
+        videoFileServiceMetrics.recordUploadDuration(sample);
+        return new VideoFileResponseDTO(videoFile.getId(), videoFile.getVideoFileName(), videoFile.getCreatedTimes());
     }
 
     public VideoFile getVideoById(UUID id) {

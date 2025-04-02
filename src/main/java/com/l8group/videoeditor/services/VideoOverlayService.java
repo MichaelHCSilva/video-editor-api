@@ -36,17 +36,20 @@ public class VideoOverlayService {
     private final VideoOverlayRepository videoOverlayRepository;
     private final VideoOverlayProducer videoOverlayProducer;
     private final VideoOverlayServiceMetrics videoOverlayServiceMetrics;
+    private final VideoStatusManagerService videoStatusManagerService; // Adicionado
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
     public VideoOverlayService(VideoFileRepository videoFileRepository,
             VideoOverlayRepository videoOverlayRepository, VideoOverlayProducer videoOverlayProducer,
-            VideoOverlayServiceMetrics videoOverlayServiceMetrics) {
+            VideoOverlayServiceMetrics videoOverlayServiceMetrics,
+            VideoStatusManagerService videoStatusManagerService) {
         this.videoFileRepository = videoFileRepository;
         this.videoOverlayRepository = videoOverlayRepository;
         this.videoOverlayProducer = videoOverlayProducer;
         this.videoOverlayServiceMetrics = videoOverlayServiceMetrics;
+        this.videoStatusManagerService = videoStatusManagerService; // Adicionado
 
     }
 
@@ -130,6 +133,11 @@ public class VideoOverlayService {
         videoOverlayServiceMetrics.decrementProcessingQueueSize(); // Remove da fila após sucesso
 
         logger.info("Registro de overlay salvo no banco de dados. ID={}", videoOverlay.getId());
+
+        // Atualizar o status do VideoOverlay após o envio para o RabbitMQ e outras
+        // operações
+        videoStatusManagerService.updateEntityStatus(videoOverlayRepository, videoOverlay.getId(),
+                VideoStatusEnum.COMPLETED, "VideoOverlayService - Conclusão");
 
         return outputFilePath;
     }

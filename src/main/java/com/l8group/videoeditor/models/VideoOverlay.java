@@ -40,6 +40,9 @@ public class VideoOverlay {
     @Column(name = "overlay_font_size", nullable = false)
     private Integer overlayFontSize;
 
+    @Column(nullable = false)
+    private int retryCount = 0;
+
     public UUID getId() {
         return id;
     }
@@ -102,6 +105,14 @@ public class VideoOverlay {
 
     public void setOverlayFontSize(Integer overlayFontSize) {
         this.overlayFontSize = overlayFontSize;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
     }
 
 }

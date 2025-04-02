@@ -47,6 +47,8 @@ public class VideoBatchService {
     private final VideoConversionService videoConversionService;
     private final VideoBatchProducer videoBatchProducer;
     private final VideoBatchServiceMetrics videoBatchServiceMetrics;
+    private final VideoStatusManagerService videoStatusManagerService; // Adicionado
+    private final S3Service s3Service; // Adicionado
 
     private static final Logger logger = LoggerFactory.getLogger(VideoBatchService.class);
 
@@ -61,7 +63,8 @@ public class VideoBatchService {
             VideoBatchProcessRepository videoBatchProcessRepository,
             VideoCutService videoCutService, VideoResizeService videoResizeService,
             VideoOverlayService videoOverlayService, VideoConversionService videoConversionService,
-            VideoBatchProducer videoBatchProducer, VideoBatchServiceMetrics videoBatchServiceMetrics) {
+            VideoBatchProducer videoBatchProducer, VideoBatchServiceMetrics videoBatchServiceMetrics,
+            VideoStatusManagerService videoStatusManagerService, S3Service s3Service) {
         this.videoFileRepository = videoFileRepository;
         this.videoBatchProcessRepository = videoBatchProcessRepository;
         this.videoCutService = videoCutService;
@@ -70,6 +73,8 @@ public class VideoBatchService {
         this.videoConversionService = videoConversionService;
         this.videoBatchProducer = videoBatchProducer;
         this.videoBatchServiceMetrics = videoBatchServiceMetrics;
+        this.videoStatusManagerService = videoStatusManagerService;
+        this.s3Service = s3Service;
     }
 
     @Transactional
@@ -97,6 +102,9 @@ public class VideoBatchService {
 
             String currentInputFilePath = Paths.get(UPLOAD_DIR, originalVideoFile.getVideoFileName()).toString();
             String outputFormat = originalVideoFile.getVideoFileFormat().replace(".", "");
+
+            VideoProcessingBatch batchProcess = createAndSaveBatchProcess(originalVideoFile, request.getOperations()); // videoFilePath inicial é nulo
+
 
             for (VideoBatchRequest.BatchOperation operation : request.getOperations()) {
                 if ("CONVERT".equalsIgnoreCase(operation.getOperationType())
@@ -151,10 +159,20 @@ public class VideoBatchService {
 
             deleteIntermediateFiles(intermediateFiles);
 
-            VideoProcessingBatch batchProcess = createAndSaveBatchProcess(originalVideoFile, request.getOperations(),
-                    finalOutputFileName);
-
             videoBatchProducer.sendVideoBatchId(batchProcess.getId());
+
+            // Upload do arquivo final para o S3 na pasta processed-videos
+            s3Service.uploadProcessedFile(new File(finalOutputPath), finalOutputFileName, originalVideoFile.getId());
+
+            // Obter a URL do arquivo no S3
+            String s3FileUrl = s3Service.getFileUrl(S3Service.PROCESSED_VIDEO_FOLDER, finalOutputFileName);
+
+            // Atualizar o videoFilePath no VideoProcessingBatch
+            batchProcess.setVideoFilePath(s3FileUrl);
+            videoBatchProcessRepository.save(batchProcess); // Salvar a atualização
+
+            videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
+                    VideoStatusEnum.COMPLETED, "processBatch");
 
             videoBatchServiceMetrics.recordBatchProcessingDuration(timerSample); // ⬅️ Registra o tempo de processamento
             videoBatchServiceMetrics.incrementBatchSuccess(); // ⬅️ Incrementa sucessos
@@ -260,13 +278,13 @@ public class VideoBatchService {
     }
 
     private VideoProcessingBatch createAndSaveBatchProcess(VideoFile videoFile,
-            List<VideoBatchRequest.BatchOperation> operations, String processedFileName) {
+                                                            List<VideoBatchRequest.BatchOperation> operations) {
         VideoProcessingBatch batchProcess = new VideoProcessingBatch();
         batchProcess.setVideoFile(videoFile);
         batchProcess.setStatus(VideoStatusEnum.PROCESSING);
         batchProcess.setCreatedTimes(ZonedDateTime.now());
         batchProcess.setUpdatedTimes(ZonedDateTime.now());
-        batchProcess.setVideoOutputFileName(processedFileName);
+        batchProcess.setVideoFilePath(null); // valor inicial é nulo
         batchProcess.setProcessingSteps(operations.stream().map(VideoBatchRequest.BatchOperation::getOperationType)
                 .collect(Collectors.toList()));
         return videoBatchProcessRepository.save(batchProcess);

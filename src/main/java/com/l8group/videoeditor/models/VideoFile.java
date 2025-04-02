@@ -40,6 +40,9 @@ public class VideoFile {
     @Column(name = "video_file_path", nullable = false)
     private String videoFilePath;
 
+    @Column(nullable = false)
+    private int retryCount = 0;
+
     public UUID getId() {
         return id;
     }
@@ -110,6 +113,14 @@ public class VideoFile {
 
     public void setVideoFilePath(String videoFilePath) {
         this.videoFilePath = videoFilePath;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
     }
 
 }

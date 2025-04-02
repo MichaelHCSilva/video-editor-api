@@ -32,6 +32,9 @@ public class VideoResize {
     @Column(name = "target_resolution", nullable = false)
     private String targetResolution;
 
+    @Column(nullable = false)
+    private int retryCount = 0;
+
     public UUID getId() {
         return id;
     }
@@ -78,6 +81,14 @@ public class VideoResize {
 
     public void setTargetResolution(String targetResolution) {
         this.targetResolution = targetResolution;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
     }
 
 }

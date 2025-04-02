@@ -38,16 +38,19 @@ public class VideoConversionService {
     private final VideoConversionRepository videoConversionRepository;
     private final VideoConversionProducer videoConversionProducer;
     private final VideoConversionServiceMetrics videoConversionServiceMetrics;
+    private final VideoStatusManagerService videoStatusManagerService; // Adicionado
+
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
     public VideoConversionService(VideoFileRepository videoFileRepository, VideoConversionRepository videoConversionRepository,
-                                  VideoConversionProducer videoConversionProducer, VideoConversionServiceMetrics videoConversionServiceMetrics) {
+                                  VideoConversionProducer videoConversionProducer, VideoConversionServiceMetrics videoConversionServiceMetrics, VideoStatusManagerService videoStatusManagerService) {
         this.videoFileRepository = videoFileRepository;
         this.videoConversionRepository = videoConversionRepository;
         this.videoConversionProducer = videoConversionProducer;
         this.videoConversionServiceMetrics = videoConversionServiceMetrics;
+        this.videoStatusManagerService = videoStatusManagerService; // Adicionado
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW) 
@@ -126,6 +129,11 @@ public class VideoConversionService {
         // Salva as informações da conversão no banco de dados
         VideoConversion videoConversion = createAndSaveVideoConversion(videoFile, outputFormat);
         logger.info("Registro de conversão salvo no banco de dados. ID={}", videoConversion.getId());
+
+         // Atualizar o status do VideoConversion após o envio para o RabbitMQ e outras operações
+        videoStatusManagerService.updateEntityStatus(videoConversionRepository, videoConversion.getId(),
+        VideoStatusEnum.COMPLETED, "VideoConversionService - Conclusão");
+
 
         return outputFilePath;
     }

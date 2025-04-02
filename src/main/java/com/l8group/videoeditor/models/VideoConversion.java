@@ -35,6 +35,9 @@ public class VideoConversion {
     @Column(name = "status", nullable = false)
     private VideoStatusEnum status;
 
+    @Column(nullable = false)
+    private int retryCount = 0; 
+
     public UUID getId() {
         return id;
     }
@@ -89,6 +92,14 @@ public class VideoConversion {
 
     public void setStatus(VideoStatusEnum status) {
         this.status = status;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
     }
 
 }

@@ -40,12 +40,16 @@ public class VideoCutService {
     private final VideoCutRepository videoCutRepository;
     private final VideoCutProducer videoCutProducer;
     private final VideoCutServiceMetrics videoCutServiceMetrics;
+    private final VideoStatusManagerService videoStatusManagerService;
 
-    public VideoCutService(VideoFileRepository videoFileRepository, VideoCutRepository videoCutRepository, VideoCutProducer videoCutProducer, VideoCutServiceMetrics videoCutServiceMetrics) {
+    public VideoCutService(VideoFileRepository videoFileRepository, VideoCutRepository videoCutRepository,
+            VideoCutProducer videoCutProducer, VideoCutServiceMetrics videoCutServiceMetrics,
+            VideoStatusManagerService videoStatusManagerService) {
         this.videoFileRepository = videoFileRepository;
         this.videoCutRepository = videoCutRepository;
         this.videoCutProducer = videoCutProducer;
         this.videoCutServiceMetrics = videoCutServiceMetrics;
+        this.videoStatusManagerService = videoStatusManagerService;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -54,7 +58,6 @@ public class VideoCutService {
                 request.getVideoId(), request.getStartTime(), request.getEndTime(), previousFilePath);
 
         videoCutServiceMetrics.incrementCutRequests();
-
 
         UUID videoId = UUID.fromString(request.getVideoId());
 
@@ -139,9 +142,15 @@ public class VideoCutService {
         videoCut.setStatus(VideoStatusEnum.PROCESSING);
 
         videoCut = videoCutRepository.save(videoCut);
-        logger.info("Registro de corte salvo no banco de dados. ID={}, Tempo de registro: {}", videoCut.getId(), LocalDateTime.now());
+        logger.info("Registro de corte salvo no banco de dados. ID={}, Tempo de registro: {}", videoCut.getId(),
+                LocalDateTime.now());
 
         videoCutProducer.sendVideoCutId(videoCut.getId());
+
+        // Atualizar o status do VideoCut após o envio para o RabbitMQ e outras
+        // operações
+        videoStatusManagerService.updateEntityStatus(videoCutRepository, videoCut.getId(), VideoStatusEnum.COMPLETED,
+                "CutService - Conclusão");
 
         return outputFilePath;
     }
