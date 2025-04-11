@@ -6,9 +6,13 @@ import java.util.UUID;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "videos_resizes")
+@Data
+@NoArgsConstructor
 public class VideoResize {
 
     @Id
@@ -34,61 +38,4 @@ public class VideoResize {
 
     @Column(nullable = false)
     private int retryCount = 0;
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public VideoFile getVideoFile() {
-        return videoFile;
-    }
-
-    public void setVideoFile(VideoFile videoFile) {
-        this.videoFile = videoFile;
-    }
-
-    public VideoStatusEnum getStatus() {
-        return status;
-    }
-
-    public void setStatus(VideoStatusEnum status) {
-        this.status = status;
-    }
-
-    public ZonedDateTime getCreatedTimes() {
-        return createdTimes;
-    }
-
-    public void setCreatedTimes(ZonedDateTime createdTimes) {
-        this.createdTimes = createdTimes;
-    }
-
-    public ZonedDateTime getUpdatedTimes() {
-        return updatedTimes;
-    }
-
-    public void setUpdatedTimes(ZonedDateTime updatedTimes) {
-        this.updatedTimes = updatedTimes;
-    }
-
-    public String getTargetResolution() {
-        return targetResolution;
-    }
-
-    public void setTargetResolution(String targetResolution) {
-        this.targetResolution = targetResolution;
-    }
-
-    public int getRetryCount() {
-        return retryCount;
-    }
-
-    public void setRetryCount(int retryCount) {
-        this.retryCount = retryCount;
-    }
-
 }

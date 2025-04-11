@@ -26,10 +26,10 @@ public class VideoCutConsumer extends AbstractRetryConsumer {
                 logger.info("Corte de vídeo {} processado com sucesso. Status atualizado às: {}", videoCutId, LocalDateTime.now());
             } catch (IllegalArgumentException e) {
                 logger.error("Erro ao converter UUID: String '{}' não é um UUID válido. Detalhes: {}", videoCutIdStr, e.getMessage());
-                throw new RuntimeException(e); // Para sair do executeWithRetry
+                throw new RuntimeException(e); 
             } catch (Exception e) {
                 logger.error("Erro ao processar corte de vídeo com ID '{}'. Detalhes: {}", videoCutIdStr, e.getMessage());
-                throw new RuntimeException(e); // Para sair do executeWithRetry
+                throw new RuntimeException(e); 
             }
         });
     }

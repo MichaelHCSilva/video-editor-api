@@ -7,9 +7,13 @@ import com.l8group.videoeditor.enums.OverlayPositionEnum;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "videos_overlay")
+@Data
+@NoArgsConstructor
 public class VideoOverlay {
 
     @Id
@@ -42,77 +46,4 @@ public class VideoOverlay {
 
     @Column(nullable = false)
     private int retryCount = 0;
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public VideoFile getVideoFile() {
-        return videoFile;
-    }
-
-    public void setVideoFile(VideoFile videoFile) {
-        this.videoFile = videoFile;
-    }
-
-    public ZonedDateTime getCreatedTimes() {
-        return createdTimes;
-    }
-
-    public void setCreatedTimes(ZonedDateTime createdTimes) {
-        this.createdTimes = createdTimes;
-    }
-
-    public ZonedDateTime getUpdatedTimes() {
-        return updatedTimes;
-    }
-
-    public void setUpdatedTimes(ZonedDateTime updatedTimes) {
-        this.updatedTimes = updatedTimes;
-    }
-
-    public VideoStatusEnum getStatus() {
-        return status;
-    }
-
-    public void setStatus(VideoStatusEnum status) {
-        this.status = status;
-    }
-
-    public String getOverlayText() {
-        return overlayText;
-    }
-
-    public void setOverlayText(String overlayText) {
-        this.overlayText = overlayText;
-    }
-
-    public OverlayPositionEnum getOverlayPosition() {
-        return overlayPosition;
-    }
-
-    public void setOverlayPosition(OverlayPositionEnum overlayPosition) {
-        this.overlayPosition = overlayPosition;
-    }
-
-    public Integer getOverlayFontSize() {
-        return overlayFontSize;
-    }
-
-    public void setOverlayFontSize(Integer overlayFontSize) {
-        this.overlayFontSize = overlayFontSize;
-    }
-
-    public int getRetryCount() {
-        return retryCount;
-    }
-
-    public void setRetryCount(int retryCount) {
-        this.retryCount = retryCount;
-    }
-
 }

@@ -26,10 +26,10 @@ public class VideoConversionConsumer extends AbstractRetryConsumer {
                 logger.info("Conversão de vídeo {} processada com sucesso. Status atualizado às: {}", videoConversionId, ZonedDateTime.now());
             } catch (IllegalArgumentException e) {
                 logger.error("Erro ao converter UUID: String '{}' não é um UUID válido. Detalhes: {}", videoConversionIdStr, e.getMessage());
-                throw new RuntimeException(e); // Para sair do executeWithRetry
+                throw new RuntimeException(e); 
             } catch (Exception e) {
                 logger.error("Erro ao processar conversão de vídeo com ID '{}'. Detalhes: {}", videoConversionIdStr, e.getMessage());
-                throw new RuntimeException(e); // Para sair do executeWithRetry
+                throw new RuntimeException(e); 
             }
         });
     }

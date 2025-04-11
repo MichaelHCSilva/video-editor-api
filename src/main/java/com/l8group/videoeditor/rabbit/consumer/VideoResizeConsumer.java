@@ -25,10 +25,10 @@ public class VideoResizeConsumer extends AbstractRetryConsumer {
                 logger.info("Redimensionamento de vídeo {} processado com sucesso. Status atualizado às: {}", videoResizeId, ZonedDateTime.now());
             } catch (IllegalArgumentException e) {
                 logger.error("Erro ao converter UUID: String '{}' não é um UUID válido. Detalhes: {}", videoResizeIdStr, e.getMessage());
-                throw new RuntimeException(e); // Para sair do executeWithRetry
+                throw new RuntimeException(e); 
             } catch (Exception e) {
                 logger.error("Erro ao processar redimensionamento de vídeo com ID '{}'. Detalhes: {}", videoResizeIdStr, e.getMessage());
-                throw new RuntimeException(e); // Para sair do executeWithRetry
+                throw new RuntimeException(e); 
             }
         });
     }

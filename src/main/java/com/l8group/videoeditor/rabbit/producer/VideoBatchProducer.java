@@ -4,6 +4,7 @@ import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -23,14 +24,22 @@ public class VideoBatchProducer {
     }
 
     public void sendBatchMessage(VideoBatchRequest videoBatchRequest) {
-        logger.info("🚀 [VideoBatchProducer] Enviando mensagem de processamento em lote para o RabbitMQ: {}", videoBatchRequest);
-        rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_EXCHANGE, RabbitMQConfig.VIDEO_BATCH_PROCESSING_ROUTING_KEY, videoBatchRequest);
-        logger.info("✅ [VideoBatchProducer] Mensagem de processamento em lote enviada para o RabbitMQ.");
+        logger.info("[VideoBatchProducer] Enviando mensagem de processamento em lote para o RabbitMQ: {}", videoBatchRequest);
+        try {
+            rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_EXCHANGE, RabbitMQConfig.VIDEO_BATCH_PROCESSING_ROUTING_KEY, videoBatchRequest);
+            logger.info("[VideoBatchProducer] Mensagem de processamento em lote enviada para o RabbitMQ.");
+        } catch (AmqpException e) {
+            logger.error("[VideoBatchProducer] Erro ao enviar mensagem de processamento em lote para o RabbitMQ: {}", e.getMessage(), e);
+        }
     }
 
     public void sendVideoBatchId(UUID batchId) {
-        logger.info("🚀 [VideoBatchProducer] Enviando ID do lote para processamento: {}", batchId);
-        rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_EXCHANGE, RabbitMQConfig.VIDEO_BATCH_PROCESSING_ROUTING_KEY, batchId.toString());
-        logger.info("✅ [VideoBatchProducer] ID do lote enviado para processamento.");
+        logger.info("[VideoBatchProducer] Enviando ID do lote para processamento: {}", batchId);
+        try {
+            rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_EXCHANGE, RabbitMQConfig.VIDEO_BATCH_PROCESSING_ROUTING_KEY, batchId.toString());
+            logger.info("[VideoBatchProducer] ID do lote enviado para processamento.");
+        } catch (AmqpException e) {
+            logger.error("[VideoBatchProducer] Erro ao enviar ID do lote para processamento: {}", e.getMessage(), e);
+        }
     }
 }

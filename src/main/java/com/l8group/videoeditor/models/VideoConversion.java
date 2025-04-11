@@ -6,9 +6,13 @@ import java.util.UUID;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "videos_conversions")
+@Data
+@NoArgsConstructor
 public class VideoConversion {
 
     @Id
@@ -36,70 +40,5 @@ public class VideoConversion {
     private VideoStatusEnum status;
 
     @Column(nullable = false)
-    private int retryCount = 0; 
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public VideoFile getVideoFile() {
-        return videoFile;
-    }
-
-    public void setVideoFile(VideoFile videoFile) {
-        this.videoFile = videoFile;
-    }
-
-    public String getVideoFileFormat() {
-        return videoFileFormat;
-    }
-
-    public void setVideoFileFormat(String videoFileFormat) {
-        this.videoFileFormat = videoFileFormat;
-    }
-
-    public String getVideoTargetFormat() {
-        return videoTargetFormat;
-    }
-
-    public void setVideoTargetFormat(String videoTargetFormat) {
-        this.videoTargetFormat = videoTargetFormat;
-    }
-
-    public ZonedDateTime getCreatedTimes() {
-        return createdTimes;
-    }
-
-    public void setCreatedTimes(ZonedDateTime createdTimes) {
-        this.createdTimes = createdTimes;
-    }
-
-    public ZonedDateTime getUpdatedTimes() {
-        return updatedTimes;
-    }
-
-    public void setUpdatedTimes(ZonedDateTime updatedTimes) {
-        this.updatedTimes = updatedTimes;
-    }
-
-    public VideoStatusEnum getStatus() {
-        return status;
-    }
-
-    public void setStatus(VideoStatusEnum status) {
-        this.status = status;
-    }
-
-    public int getRetryCount() {
-        return retryCount;
-    }
-
-    public void setRetryCount(int retryCount) {
-        this.retryCount = retryCount;
-    }
-
+    private int retryCount = 0;
 }

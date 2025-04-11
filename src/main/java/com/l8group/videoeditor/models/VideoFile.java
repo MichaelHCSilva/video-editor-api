@@ -6,9 +6,13 @@ import java.util.UUID;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "videos_files")
+@Data
+@NoArgsConstructor
 public class VideoFile {
 
     @Id
@@ -42,85 +46,4 @@ public class VideoFile {
 
     @Column(nullable = false)
     private int retryCount = 0;
-
-    public UUID getId() {
-        return id;
-    }
-
-    public void setId(UUID id) {
-        this.id = id;
-    }
-
-    public String getVideoFileName() {
-        return videoFileName;
-    }
-
-    public void setVideoFileName(String videoFileName) {
-        this.videoFileName = videoFileName;
-    }
-
-    public Long getVideoFileSize() {
-        return videoFileSize;
-    }
-
-    public void setVideoFileSize(Long videoFileSize) {
-        this.videoFileSize = videoFileSize;
-    }
-
-    public String getVideoFileFormat() {
-        return videoFileFormat;
-    }
-
-    public void setVideoFileFormat(String videoFileFormat) {
-        this.videoFileFormat = videoFileFormat;
-    }
-
-    public ZonedDateTime getCreatedTimes() {
-        return createdTimes;
-    }
-
-    public void setCreatedTimes(ZonedDateTime createdTimes) {
-        this.createdTimes = createdTimes;
-    }
-
-    public ZonedDateTime getUpdatedTimes() {
-        return updatedTimes;
-    }
-
-    public void setUpdatedTimes(ZonedDateTime updatedTimes) {
-        this.updatedTimes = updatedTimes;
-    }
-
-    public VideoStatusEnum getStatus() {
-        return status;
-    }
-
-    public void setStatus(VideoStatusEnum status) {
-        this.status = status;
-    }
-
-    public String getVideoDuration() {
-        return videoDuration;
-    }
-
-    public void setVideoDuration(String videoDuration) {
-        this.videoDuration = videoDuration;
-    }
-
-    public String getVideoFilePath() {
-        return videoFilePath;
-    }
-
-    public void setVideoFilePath(String videoFilePath) {
-        this.videoFilePath = videoFilePath;
-    }
-
-    public int getRetryCount() {
-        return retryCount;
-    }
-
-    public void setRetryCount(int retryCount) {
-        this.retryCount = retryCount;
-    }
-
 }

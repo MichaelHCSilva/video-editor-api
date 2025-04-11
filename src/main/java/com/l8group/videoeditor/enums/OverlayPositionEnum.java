@@ -16,9 +16,4 @@ public enum OverlayPositionEnum {
     public String getPosition() {
         return position;
     }
-
-    @Override
-    public String toString() {
-        return position;
-    }
 }

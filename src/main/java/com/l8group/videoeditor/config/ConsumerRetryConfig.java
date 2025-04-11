@@ -4,7 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class RetryConfig {
+public class ConsumerRetryConfig {
 
     @Value("${video.consumer.retry.max-retries}")
     private int maxRetries;

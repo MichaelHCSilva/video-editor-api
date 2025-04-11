@@ -26,10 +26,10 @@ public class VideoBatchConsumer extends AbstractRetryConsumer {
                 logger.info("Processamento em lote {} processado com sucesso às: {}", batchId, LocalDateTime.now());
             } catch (IllegalArgumentException e) {
                 logger.error("Erro ao converter UUID: String '{}' não é um UUID válido. Detalhes: {}", batchIdStr, e.getMessage());
-                throw new RuntimeException(e); // Para sair do executeWithRetry
+                throw new RuntimeException(e); 
             } catch (Exception e) {
                 logger.error("Erro ao processar lote de vídeos com ID '{}'. Detalhes: {}", batchIdStr, e.getMessage());
-                throw new RuntimeException(e); // Para sair do executeWithRetry
+                throw new RuntimeException(e); 
             }
         });
     }
