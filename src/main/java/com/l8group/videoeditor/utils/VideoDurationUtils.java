@@ -4,29 +4,25 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 
+import com.l8group.videoeditor.models.VideoFile;
+
 public class VideoDurationUtils {
 
     private static final String DEFAULT_DURATION = "00:00:00";
 
-    /**
-     * Obtém a duração de um vídeo no formato HH:mm:ss usando FFmpeg.
-     *
-     * @param filePath Caminho do arquivo de vídeo.
-     * @return Duração do vídeo como string (HH:mm:ss).
-     * @throws IOException Se houver erro ao executar o comando FFmpeg.
-     */
+    // Método já existente para obter a duração do vídeo no formato HH:mm:ss
     public static String getVideoDurationAsString(String filePath) throws IOException {
         String duration = runFFmpegDurationCommand(filePath);
         return normalizeDurationFormat(duration);
     }
 
-    /**
-     * Executa o comando FFmpeg para obter a duração do vídeo.
-     *
-     * @param filePath Caminho do arquivo de vídeo.
-     * @return Duração no formato HH:mm:ss.
-     * @throws IOException Se houver erro ao executar o FFmpeg.
-     */
+    // Novo método para obter a duração do vídeo em segundos, utilizando o VideoFile
+    public static int getVideoDurationInSeconds(VideoFile videoFile) throws IOException {
+        // Supondo que o VideoFile tem um método getFilePath() que retorna o caminho do arquivo
+        String durationString = getVideoDurationAsString(videoFile.getVideoFilePath());
+        return convertTimeToSeconds(durationString);
+    }
+
     private static String runFFmpegDurationCommand(String filePath) throws IOException {
         ProcessBuilder processBuilder = new ProcessBuilder("ffmpeg", "-i", filePath);
         processBuilder.redirectErrorStream(true);
@@ -44,12 +40,6 @@ public class VideoDurationUtils {
         throw new IOException("Não foi possível obter a duração do vídeo.");
     }
 
-    /**
-     * Extrai a duração do vídeo a partir da saída do FFmpeg.
-     *
-     * @param line Linha de saída contendo a duração.
-     * @return Duração no formato HH:mm:ss.
-     */
     private static String extractDuration(String line) {
         String[] parts = line.split(",");
         for (String part : parts) {
@@ -60,12 +50,6 @@ public class VideoDurationUtils {
         return DEFAULT_DURATION;
     }
 
-    /**
-     * Normaliza uma string de duração (HH:mm:ss) garantindo que tenha o formato correto.
-     *
-     * @param duration Duração no formato HH:mm:ss.
-     * @return String formatada corretamente.
-     */
     private static String normalizeDurationFormat(String duration) {
         String[] timeParts = duration.trim().split(":");
         if (timeParts.length == 3) {
@@ -77,33 +61,53 @@ public class VideoDurationUtils {
         return DEFAULT_DURATION;
     }
 
-    /**
-     * Converte uma string no formato "HH:mm:ss" para segundos inteiros.
-     *
-     * @param time Tempo no formato "HH:mm:ss".
-     * @return Tempo convertido em segundos.
-     */
     public static int convertTimeToSeconds(String time) {
-        String[] parts = time.split(":");
-        if (parts.length != 3) {
-            throw new IllegalArgumentException("Formato inválido: " + time);
+        if (time == null || time.trim().isEmpty()) {
+            throw new IllegalArgumentException("Formato de tempo inválido: Tempo não pode ser vazio.");
         }
-        int hours = Integer.parseInt(parts[0]);
-        int minutes = Integer.parseInt(parts[1]);
-        int seconds = Integer.parseInt(parts[2]);
-        return (hours * 3600) + (minutes * 60) + seconds;
+
+        boolean isNegative = false;
+        if (time.startsWith("-")) {
+            isNegative = true;
+            time = time.substring(1); // Remove o sinal negativo para o parsing
+        }
+
+        String[] parts = time.split(":");
+        int hours = 0;
+        int minutes = 0;
+        int seconds = 0;
+
+        try {
+            switch (parts.length) {
+                case 3:
+                    hours = Integer.parseInt(parts[0]);
+                    minutes = Integer.parseInt(parts[1]);
+                    seconds = (int) Math.floor(Double.parseDouble(parts[2])); // Trunca a fração
+                    break;
+                case 2:
+                    minutes = Integer.parseInt(parts[0]);
+                    seconds = (int) Math.floor(Double.parseDouble(parts[1])); // Trunca a fração
+                    break;
+                case 1:
+                    seconds = (int) Math.floor(Double.parseDouble(parts[0])); // Trunca a fração
+                    break;
+                default:
+                    throw new IllegalArgumentException("Formato de tempo inválido: " + time);
+            }
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("Formato de tempo inválido: " + time + ". Certifique-se de usar números inteiros.");
+        }
+
+        int totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
+        return isNegative ? -totalSeconds : totalSeconds;
     }
 
-    /**
-     * Converte um tempo em segundos para o formato "HH:mm:ss".
-     *
-     * @param totalSeconds Tempo em segundos.
-     * @return Tempo formatado como string "HH:mm:ss".
-     */
     public static String formatSecondsToTime(int totalSeconds) {
-        int hours = totalSeconds / 3600;
-        int minutes = (totalSeconds % 3600) / 60;
-        int seconds = totalSeconds % 60;
-        return String.format("%02d:%02d:%02d", hours, minutes, seconds);
+        int absSeconds = Math.abs(totalSeconds);
+        int hours = absSeconds / 3600;
+        int minutes = (absSeconds % 3600) / 60;
+        int seconds = absSeconds % 60;
+        String sign = totalSeconds < 0 ? "-" : "";
+        return String.format("%s%02d:%02d:%02d", sign, hours, minutes, seconds);
     }
 }

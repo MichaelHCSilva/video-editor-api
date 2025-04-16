@@ -43,21 +43,17 @@ public class VideoProcessingConsumer extends AbstractRetryConsumer {
                     throw new IllegalStateException("Arquivo local não encontrado: " + videoFile.getVideoFilePath());
                 }
 
-                String s3Url;
                 try {
-                    s3Url = s3Service.uploadRawFile(file, videoFile.getVideoFileName(), videoId);
+                    String s3Url = s3Service.uploadRawFile(file, videoFile.getVideoFileName(), videoId);
+                    logger.info("Upload para o S3 finalizado com sucesso: {}", s3Url);
+                    // NÃO ATUALIZA MAIS O videoFilePath com o S3!!!
                 } catch (IOException ioException) {
                     logger.error("Erro de IO ao tentar fazer upload para o S3 do vídeo ID '{}': {}", videoId, ioException.getMessage());
                     throw new RuntimeException("Erro ao fazer upload para o S3", ioException);
                 }
 
-                videoFile.setVideoFilePath(s3Url);
-                videoFileRepository.saveAndFlush(videoFile);
-
                 videoStatusManagerService.updateEntityStatus(
                         videoFileRepository, videoId, VideoStatusEnum.COMPLETED, "RabbitConsumerUpload");
-
-                logger.info("Upload para o S3 finalizado com sucesso: {}", s3Url);
 
             } catch (IllegalArgumentException e) {
                 logger.error("Erro ao converter UUID. String '{}' não é um UUID válido. Detalhes: {}", videoIdStr, e.getMessage());

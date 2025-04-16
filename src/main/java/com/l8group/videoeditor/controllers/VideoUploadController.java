@@ -1,51 +1,46 @@
 package com.l8group.videoeditor.controllers;
 
-//import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.l8group.videoeditor.dtos.*;
-import com.l8group.videoeditor.requests.*;
+import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
+import com.l8group.videoeditor.dtos.VideoFileListDTO;
+import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
+import com.l8group.videoeditor.exceptions.InvalidCutTimeException;
+import com.l8group.videoeditor.requests.VideoBatchRequest;
 import com.l8group.videoeditor.responses.ErrorResponse;
-import com.l8group.videoeditor.responses.SuccessResponse;
-import com.l8group.videoeditor.services.*;
+import com.l8group.videoeditor.services.VideoBatchService;
+import com.l8group.videoeditor.services.VideoDownloadService;
+import com.l8group.videoeditor.services.VideoFileService;
 
 import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @RestController
 @RequestMapping("/api/videos")
+@RequiredArgsConstructor
+@Slf4j
 public class VideoUploadController {
 
     private final VideoFileService videoFileService;
-    private final VideoCutService videoCutService;
-    private final VideoResizeService videoResizeService;
-    private final VideoOverlayService videoOverlayService;
-    private final VideoConversionService videoConversionService;
     private final VideoBatchService videoBatchService;
     private final VideoDownloadService videoDownloadService;
-
-    private static final Logger logger = LoggerFactory.getLogger(VideoUploadController.class);
-
-    public VideoUploadController(VideoFileService videoFileService, VideoCutService videoCutService,
-            VideoResizeService videoResizeService, VideoOverlayService videoOverlayService,
-            VideoConversionService videoConversionService, VideoBatchService videoBatchService,
-            VideoDownloadService videoDownloadService) {
-        this.videoFileService = videoFileService;
-        this.videoCutService = videoCutService;
-        this.videoResizeService = videoResizeService;
-        this.videoOverlayService = videoOverlayService;
-        this.videoConversionService = videoConversionService;
-        this.videoBatchService = videoBatchService;
-        this.videoDownloadService = videoDownloadService;
-    }
 
     @PostMapping("/upload")
     public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") List<MultipartFile> files) {
@@ -57,6 +52,7 @@ public class VideoUploadController {
                 VideoFileResponseDTO response = videoFileService.uploadVideo(file);
                 successList.add(response);
             } catch (Exception e) {
+                log.error("Erro ao fazer upload do vídeo '{}': {}", file.getOriginalFilename(), e.getMessage(), e);
                 Map<String, String> errorMap = new HashMap<>();
                 errorMap.put("fileName", file.getOriginalFilename());
                 errorMap.put("error", e.getMessage());
@@ -73,79 +69,16 @@ public class VideoUploadController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping("/edit/cut")
-    public ResponseEntity<?> cutVideo(@Valid @RequestBody VideoCutRequest request,
-            @RequestParam(value = "outputFilePath", required = false) String outputFilePath) {
-        try {
-            String path = videoCutService.cutVideo(request, outputFilePath);
-            return ResponseEntity.ok(new SuccessResponse("Vídeo cortado com sucesso: " + path));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
-        } catch (RuntimeException e) {
-            logger.error("Erro ao cortar vídeo", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Erro ao processar o corte do vídeo: " + e.getMessage()));
-        }
-    }
-
-    @PostMapping("/edit/resize")
-    public ResponseEntity<?> resizeVideo(@Valid @RequestBody VideoResizeRequest request,
-            @RequestParam(value = "outputFilePath", required = false) String outputFilePath) {
-        try {
-            String path = videoResizeService.resizeVideo(request, outputFilePath);
-            return ResponseEntity.ok(new SuccessResponse("Vídeo redimensionado com sucesso: " + path));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
-        } catch (RuntimeException e) {
-            logger.error("Erro ao redimensionar vídeo", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Erro ao processar o redimensionamento do vídeo: " + e.getMessage()));
-        }
-    }
-
-    @PostMapping("/edit/overlay-text")
-    public ResponseEntity<?> overlayText(@Valid @RequestBody VideoOverlayRequest request,
-            @RequestParam(value = "outputFilePath", required = false) String outputFilePath) {
-        try {
-            String path = videoOverlayService.processOverlay(request, outputFilePath);
-            return ResponseEntity.ok(new SuccessResponse("Texto aplicado com sucesso: " + path));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
-        } catch (RuntimeException e) {
-            logger.error("Erro ao aplicar overlay", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Erro ao processar o overlay de texto: " + e.getMessage()));
-        }
-    }
-
-    @PostMapping("/convert")
-    public ResponseEntity<?> convertVideo(@Valid @RequestBody VideoConversionRequest request,
-            @RequestParam(value = "outputFilePath", required = false) String outputFilePath) {
-        logger.info("Recebida solicitação de conversão de vídeo: {}", request);
-        try {
-            String path = videoConversionService.convertVideo(request, outputFilePath);
-            return ResponseEntity.ok(new SuccessResponse("Conversão realizada com sucesso: " + path));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
-        } catch (RuntimeException e) {
-            logger.error("Erro ao converter vídeo", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Erro ao processar a conversão do vídeo: " + e.getMessage()));
-        }
-    }
-
     @PostMapping("/batch-process")
     public ResponseEntity<?> processBatch(@Valid @RequestBody VideoBatchRequest request) {
-        logger.info("Recebida solicitação de processamento em lote: {}", request);
+        log.info("Recebida solicitação de processamento em lote: {}", request);
         try {
             VideoBatchResponseDTO response = videoBatchService.processBatch(request);
             return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
-        } catch (RuntimeException e) {
-            logger.error("Erro no processamento em lote", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(new ErrorResponse("Erro ao processar o lote de vídeos: " + e.getMessage()));
+        } catch (Exception e) {
+            log.error("Erro ao processar vídeo em lote: {}", e.getMessage(), e);
+            // Deixa o GlobalExceptionHandler tratar exceções mais específicas
+            throw e;
         }
     }
 
@@ -154,11 +87,12 @@ public class VideoUploadController {
         try {
             Resource resource = videoDownloadService.getProcessedVideo(batchProcessId);
             return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                    .header(HttpHeaders.CONTENT_DISPOSITION,
+                            "attachment; filename=\"" + resource.getFilename() + "\"")
                     .body(resource);
         } catch (Exception e) {
-            logger.error("Erro ao fazer download do vídeo", e);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            log.error("Erro ao fazer download do vídeo com ID {}", batchProcessId, e);
+            return ResponseEntity.status(404)
                     .body(new ErrorResponse("Vídeo não encontrado: " + e.getMessage()));
         }
     }

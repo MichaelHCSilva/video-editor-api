@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 @Converter
 public class videoOperationsConverter implements AttributeConverter<List<String>, String> {
 
-    private static final String SPLIT_CHAR = ",";
+    private static final String SPLIT_CHAR = ", ";
 
     @Override
     public String convertToDatabaseColumn(List<String> attribute) {

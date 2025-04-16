@@ -3,6 +3,7 @@ package com.l8group.videoeditor.services;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.UUID;
 
 import org.slf4j.Logger;
@@ -12,9 +13,11 @@ import org.springframework.stereotype.Service;
 
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.sync.ResponseTransformer;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetUrlRequest;
 import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
@@ -136,4 +139,29 @@ public class S3Service {
             return false;
         }
     }
+
+    /**
+     * Baixa o arquivo do S3 e salva no local especificado.
+     * 
+     * @param s3Url         URL S3 do arquivo a ser baixado.
+     * @param localFilePath Caminho local onde o arquivo será salvo.
+     * @throws IOException Se ocorrer um erro durante o download.
+     */
+    public void downloadFile(String s3Url, String localFilePath) throws IOException {
+        try {
+            // O S3 usa o URL do arquivo (o caminho armazenado no videoFilePath) para baixar
+            // o arquivo
+            s3Client.getObject(GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(s3Url) // Usando o caminho do arquivo no S3
+                    .build(),
+                    ResponseTransformer.toFile(Paths.get(localFilePath))); // Baixando para o localFilePath
+
+            logger.info("Arquivo baixado com sucesso do S3: {}", s3Url);
+        } catch (S3Exception e) {
+            logger.error("Erro ao baixar o arquivo do S3: {}", e.getMessage());
+            throw new IOException("Falha ao baixar o arquivo do S3", e);
+        }
+    }
+
 }
