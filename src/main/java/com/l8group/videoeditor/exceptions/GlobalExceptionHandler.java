@@ -2,20 +2,22 @@ package com.l8group.videoeditor.exceptions;
 
 import com.l8group.videoeditor.responses.ErrorResponse;
 import jakarta.validation.ConstraintViolationException;
-
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
-
 import java.nio.file.AccessDeniedException;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(VideoNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleVideoNotFound(VideoNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
 
     @ExceptionHandler(VideoProcessingNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleProcessingNotFound(VideoProcessingNotFoundException ex) {
@@ -37,8 +39,8 @@ public class GlobalExceptionHandler {
         String errorMessage = "Requisição inválida. Verifique os dados enviados.";
         if (ex.getBindingResult().hasErrors()) {
             errorMessage = ex.getBindingResult().getFieldErrors().stream()
-                                 .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
-                                 .collect(Collectors.joining(", "));
+                    .map(fieldError -> fieldError.getDefaultMessage())
+                    .collect(Collectors.joining(", "));
         }
         return buildResponse(HttpStatus.BAD_REQUEST, errorMessage);
     }
@@ -46,16 +48,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(WebExchangeBindException.class)
     public ResponseEntity<ErrorResponse> handleWebExchangeBindException(WebExchangeBindException ex) {
         String errors = ex.getBindingResult().getFieldErrors().stream()
-                             .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                             .collect(Collectors.joining(", "));
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.joining(", "));
         return buildResponse(HttpStatus.BAD_REQUEST, "Erros na requisição: " + errors);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolationException(ConstraintViolationException ex) {
         String errors = ex.getConstraintViolations().stream()
-                             .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
-                             .collect(Collectors.joining(", "));
+                .map(violation -> violation.getPropertyPath() + ": " + violation.getMessage())
+                .collect(Collectors.joining(", "));
         return buildResponse(HttpStatus.BAD_REQUEST, "Erros de validação: " + errors);
     }
 
@@ -66,13 +68,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
-        String errorMessage = ex.getMessage();
-        if (errorMessage.startsWith("Erros na requisição de corte: ")) {
-            return buildResponse(HttpStatus.BAD_REQUEST,
-                                 errorMessage.substring("Erros na requisição de corte: ".length()).trim());
-        } else {
-            return buildResponse(HttpStatus.BAD_REQUEST, errorMessage);
-        }
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
     @ExceptionHandler(InvalidCutTimeException.class)
@@ -95,8 +91,19 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    @ExceptionHandler(VideoDurationParseException.class) // Novo ExceptionHandler
+    @ExceptionHandler(VideoDurationParseException.class)
     public ResponseEntity<ErrorResponse> handleVideoDurationParseException(VideoDurationParseException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(InvalidResizeParameterException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidResizeParameterException(InvalidResizeParameterException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    // Adicione este handler para a sua InvalidVideoIdListException
+    @ExceptionHandler(InvalidVideoIdListException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidVideoIdListException(InvalidVideoIdListException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 

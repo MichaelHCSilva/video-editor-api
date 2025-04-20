@@ -10,18 +10,18 @@ import lombok.Data;
 @Data
 public class VideoBatchRequest {
 
-    @NotEmpty(message = "A lista de vídeos não pode estar vazia.")
+    @NotEmpty(message = "Por favor, forneça a lista de IDs dos vídeos a serem processados.")
     private List<String> videoIds;
 
-    @NotEmpty(message = "A lista de operações não pode estar vazia.")
+    @NotEmpty(message = "A lista de operações a serem realizadas não pode estar vazia. Defina pelo menos uma operação (CUT, RESIZE, CONVERT, OVERLAY).")
     private List<BatchOperation> operations;
 
     @Data
     public static class BatchOperation {
-        @NotNull(message = "O tipo de operação é obrigatório.")
+        @NotNull(message = "O tipo da operação é obrigatório. Os tipos suportados são: CUT, RESIZE, CONVERT e OVERLAY.")
         private String operationType;
 
-        @NotNull(message = "Os parâmetros da operação são obrigatórios.")
+        @NotNull(message = "Os parâmetros específicos para a operação devem ser fornecidos.")
         private OperationParameters parameters;
     }
 
@@ -29,8 +29,8 @@ public class VideoBatchRequest {
     public static class OperationParameters {
         private String startTime; // Para CUT
         private String endTime; // Para CUT
-        private Integer width; // Para RESIZE
-        private Integer height; // Para RESIZE
+        private String width; // Para RESIZE
+        private String height; // Para RESIZE
         private String outputFormat; // Para CONVERT
         private String watermark; // Para OVERLAY
         private OverlayPositionEnum position; // Para OVERLAY

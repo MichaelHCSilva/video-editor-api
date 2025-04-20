@@ -77,7 +77,6 @@ public class VideoUploadController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Erro ao processar vídeo em lote: {}", e.getMessage(), e);
-            // Deixa o GlobalExceptionHandler tratar exceções mais específicas
             throw e;
         }
     }

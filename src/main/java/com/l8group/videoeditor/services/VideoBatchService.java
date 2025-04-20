@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity; // Import ResponseEntity
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.InvalidCutTimeException;
+import com.l8group.videoeditor.exceptions.InvalidResizeParameterException;
+import com.l8group.videoeditor.exceptions.InvalidVideoIdListException; // Importe a nova exceção
+import com.l8group.videoeditor.exceptions.VideoNotFoundException;
 import com.l8group.videoeditor.metrics.VideoBatchServiceMetrics;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
@@ -34,6 +38,7 @@ import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoUtils;
+import com.l8group.videoeditor.validation.VideoResizeValidator;
 
 import io.micrometer.core.instrument.Timer;
 import jakarta.validation.ConstraintViolation;
@@ -56,7 +61,7 @@ public class VideoBatchService {
     private final VideoBatchServiceMetrics videoBatchServiceMetrics;
     private final VideoStatusManagerService videoStatusManagerService;
     private final S3Service s3Service;
-    private final Validator validator; // Injete o Validator
+    private final Validator validator;
 
     private static final Logger logger = LoggerFactory.getLogger(VideoBatchService.class);
 
@@ -71,35 +76,37 @@ public class VideoBatchService {
         logger.info("🟢 [processBatch] Iniciando processamento em lote | Vídeos: {} | Operações: {}",
                 request.getVideoIds(), request.getOperations());
 
-        videoBatchServiceMetrics.incrementBatchRequests(); // ⬅️ Registra uma nova solicitação
-        videoBatchServiceMetrics.incrementProcessingQueueSize(); // ⬅️ Incrementa a fila de processamento
+        videoBatchServiceMetrics.incrementBatchRequests();
+        videoBatchServiceMetrics.incrementProcessingQueueSize();
 
-        Timer.Sample timerSample = videoBatchServiceMetrics.startBatchProcessingTimer(); // ⬅️ Inicia a medição do tempo
+        Timer.Sample timerSample = videoBatchServiceMetrics.startBatchProcessingTimer();
 
         List<String> intermediateFiles = new ArrayList<>();
 
         try {
             createTempDirectory();
 
-            // Validação se a lista de videoIds está vazia
-            if (request.getVideoIds().isEmpty()) {
+            if (request.getVideoIds() == null || request.getVideoIds().isEmpty()) {
                 logger.error("❌ [processBatch] A lista de videoIds não pode estar vazia.");
-                throw new IllegalArgumentException("A lista de videoIds não pode estar vazia.");
+                throw new InvalidVideoIdListException("A lista de IDs de vídeo não pode estar vazia.");
             }
 
-            UUID firstVideoId;
-            try {
-                firstVideoId = UUID.fromString(request.getVideoIds().get(0));
-            } catch (IllegalArgumentException e) {
-                logger.error("❌ [processBatch] Formato de ID de vídeo inválido: {}", request.getVideoIds().get(0));
-                throw new IllegalArgumentException("Formato dO ID de vídeo inválido: " + request.getVideoIds().get(0));
+            for (String videoId : request.getVideoIds()) {
+                if (videoId == null || videoId.trim().isEmpty()) {
+                    logger.error("❌ [processBatch] ID de vídeo inválido: {}", videoId);
+                    throw new InvalidVideoIdListException("Insira um ID de vídeo válido.");
+                }
+                try {
+                    UUID.fromString(videoId); // Tenta converter para UUID para validar o formato básico
+                } catch (IllegalArgumentException e) {
+                    logger.error("❌ [processBatch] Formato de ID de vídeo inválido: {}", videoId);
+                    throw new InvalidVideoIdListException("O ID de vídeo '" + videoId + "' possui um formato inválido.");
+                }
             }
 
+            UUID firstVideoId = UUID.fromString(request.getVideoIds().get(0));
             VideoFile originalVideoFile = videoFileRepository.findById(firstVideoId)
-                    .orElseThrow(() -> {
-                        logger.error("❌ [processBatch] Vídeo original não encontrado: {}", firstVideoId);
-                        return new RuntimeException("Vídeo original não encontrado.");
-                    });
+                    .orElseThrow(() -> new VideoNotFoundException(firstVideoId));
 
             String currentInputFilePath = Paths.get(UPLOAD_DIR, originalVideoFile.getVideoFileName()).toString();
             String outputFormat = originalVideoFile.getVideoFileFormat().replace(".", "");
@@ -128,20 +135,17 @@ public class VideoBatchService {
                                     outputFilePath);
                             throw new RuntimeException("Arquivo de saída não encontrado após operação.");
                         }
-
-                        // Adiciona apenas os arquivos da pasta TEMP para exclusão
                         if (currentInputFilePath.startsWith(TEMP_DIR)) {
                             intermediateFiles.add(currentInputFilePath);
                         }
-
                         currentInputFilePath = outputFilePath;
                     }
 
-                } catch (InvalidCutTimeException | IllegalArgumentException e) {
-                    throw e; // Relança ambas as exceções
+                } catch (InvalidCutTimeException | IllegalArgumentException | InvalidResizeParameterException e) {
+                    throw e; // Relança as exceções específicas
                 } catch (Exception e) {
                     logger.error("❌ [processBatch] Erro ao processar operação: {}", operation.getOperationType(), e);
-                    videoBatchServiceMetrics.incrementBatchFailure(); // ⬅️ Incrementa falhas
+                    videoBatchServiceMetrics.incrementBatchFailure();
                     throw new RuntimeException("Falha ao processar operação.", e);
                 }
             }
@@ -163,35 +167,35 @@ public class VideoBatchService {
 
             videoBatchProducer.sendVideoBatchId(batchProcess.getId());
 
-            // Upload do arquivo final para o S3 na pasta processed-videos
             s3Service.uploadProcessedFile(new File(finalOutputPath), finalOutputFileName, originalVideoFile.getId());
-
-            // Obter a URL do arquivo no S3
             String s3FileUrl = s3Service.getFileUrl(S3Service.PROCESSED_VIDEO_FOLDER, finalOutputFileName);
-
-            // Atualizar o videoFilePath no VideoProcessingBatch
             batchProcess.setVideoFilePath(s3FileUrl);
-            videoBatchProcessRepository.save(batchProcess); // Salvar a atualização
+            videoBatchProcessRepository.save(batchProcess);
 
             videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
                     VideoStatusEnum.COMPLETED, "processBatch");
 
-            videoBatchServiceMetrics.recordBatchProcessingDuration(timerSample); // ⬅️ Registra o tempo de processamento
-            videoBatchServiceMetrics.incrementBatchSuccess(); // ⬅️ Incrementa sucessos
-            videoBatchServiceMetrics.decrementProcessingQueueSize(); // ⬅️ Decrementa a fila de processamento
+            videoBatchServiceMetrics.recordBatchProcessingDuration(timerSample);
+            videoBatchServiceMetrics.incrementBatchSuccess();
+            videoBatchServiceMetrics.decrementProcessingQueueSize();
 
             long processedFileSize = new File(finalOutputPath).length();
-            videoBatchServiceMetrics.setProcessedFileSize(processedFileSize); // ⬅️ Define o tamanho do arquivo final
+            videoBatchServiceMetrics.setProcessedFileSize(processedFileSize);
 
             logger.info("✅ [processBatch] Processamento concluído | Vídeo ID: {} | Arquivo final: {}",
                     originalVideoFile.getId(), finalOutputPath);
 
             return new VideoBatchResponseDTO(
-                    batchProcess.getId(), // ID do processamento em lote
+                    batchProcess.getId(),
                     finalOutputFileName,
                     batchProcess.getCreatedTimes(),
                     batchProcess.getProcessingSteps());
 
+        } catch (InvalidVideoIdListException e) {
+            // Captura a exceção específica para lista de IDs inválida
+            videoBatchServiceMetrics.incrementBatchFailure();
+            videoBatchServiceMetrics.decrementProcessingQueueSize();
+            throw e;
         } catch (IOException e) {
             log.error("❌ [processBatch] Erro geral de I/O durante o processamento do lote", e);
             videoBatchServiceMetrics.incrementBatchFailure();
@@ -201,7 +205,7 @@ public class VideoBatchService {
             log.error("❌ [processBatch] Erro geral durante o processamento do lote", e);
             videoBatchServiceMetrics.incrementBatchFailure();
             videoBatchServiceMetrics.decrementProcessingQueueSize();
-            throw e; // Relança a exceção original para ser tratada por camadas superiores
+            throw e;
         }
 
     }
@@ -223,8 +227,6 @@ public class VideoBatchService {
                     cutRequest.setVideoId(videoId);
                     cutRequest.setStartTime(parameters.getStartTime());
                     cutRequest.setEndTime(parameters.getEndTime());
-
-                    // Validar o VideoCutRequest ANTES de chamar o VideoCutService
                     Set<ConstraintViolation<VideoCutRequest>> violations = validator.validate(cutRequest);
                     if (!violations.isEmpty()) {
                         String errorMessages = violations.stream()
@@ -232,14 +234,28 @@ public class VideoBatchService {
                                 .collect(Collectors.joining(", "));
                         throw new IllegalArgumentException("Erros na requisição de corte: " + errorMessages);
                     }
-
                     yield videoCutService.cutVideo(cutRequest, currentInputFilePath);
                 }
                 case "RESIZE" -> {
-                    VideoResizeRequest resizeRequest = new VideoResizeRequest();
-                    resizeRequest.setVideoId(videoId);
-                    resizeRequest.setWidth(parameters.getWidth());
-                    resizeRequest.setHeight(parameters.getHeight());
+                    Integer width = parseInteger(parameters.getWidth());
+                    String heightStr = parameters.getHeight();
+
+                    try {
+                        VideoResizeValidator.validateNumericWidthAndHeight(parameters.getWidth(), heightStr);
+                    } catch (InvalidResizeParameterException e) {
+                        throw e;
+                    }
+
+                    Integer height = parseInteger(heightStr);
+                    VideoResizeRequest resizeRequest = new VideoResizeRequest(videoId, width, height);
+
+                    Set<ConstraintViolation<VideoResizeRequest>> violations = validator.validate(resizeRequest);
+                    if (!violations.isEmpty()) {
+                        String errorMessages = violations.stream()
+                                .map(ConstraintViolation::getMessage)
+                                .collect(Collectors.joining(", "));
+                        throw new IllegalArgumentException("Erros na requisição de redimensionamento: " + errorMessages);
+                    }
                     yield videoResizeService.resizeVideo(resizeRequest, currentInputFilePath);
                 }
                 case "OVERLAY" -> {
@@ -248,12 +264,26 @@ public class VideoBatchService {
                     overlayRequest.setWatermark(parameters.getWatermark());
                     overlayRequest.setPosition(parameters.getPosition());
                     overlayRequest.setFontSize(parameters.getFontSize());
+                    Set<ConstraintViolation<VideoOverlayRequest>> violations = validator.validate(overlayRequest);
+                    if (!violations.isEmpty()) {
+                        String errorMessages = violations.stream()
+                                .map(ConstraintViolation::getMessage)
+                                .collect(Collectors.joining(", "));
+                        throw new IllegalArgumentException("Erros na requisição de overlay: " + errorMessages);
+                    }
                     yield videoOverlayService.processOverlay(overlayRequest, currentInputFilePath);
                 }
                 case "CONVERT" -> {
                     VideoConversionRequest convertRequest = new VideoConversionRequest();
                     convertRequest.setVideoId(videoId);
                     convertRequest.setOutputFormat(outputFormat);
+                    Set<ConstraintViolation<VideoConversionRequest>> violations = validator.validate(convertRequest);
+                    if (!violations.isEmpty()) {
+                        String errorMessages = violations.stream()
+                                .map(ConstraintViolation::getMessage)
+                                .collect(Collectors.joining(", "));
+                        throw new IllegalArgumentException("Erros na requisição de conversão: " + errorMessages);
+                    }
                     yield videoConversionService.convertVideo(convertRequest, currentInputFilePath);
                 }
                 default -> throw new IllegalArgumentException("Operação inválida: " + operation.getOperationType());
@@ -263,6 +293,9 @@ public class VideoBatchService {
                     operation.getOperationType(), outputFilePath);
             return outputFilePath;
 
+        } catch (InvalidResizeParameterException e) {
+            logger.error("❌ [executeOperation] Erro de validação de redimensionamento: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
             logger.error("❌ [executeOperation] Erro ao executar operação: {}", operation.getOperationType(), e);
             throw new RuntimeException("Falha ao processar operação.", e);
@@ -271,7 +304,6 @@ public class VideoBatchService {
 
     private void createTempDirectory() {
         logger.info("🛠️ [createTempDirectory] Verificando ou criando diretório temporário: {}", TEMP_DIR);
-
         Path tempDirPath = Paths.get(TEMP_DIR);
         if (!Files.exists(tempDirPath)) {
             try {
@@ -296,13 +328,13 @@ public class VideoBatchService {
     }
 
     private VideoProcessingBatch createAndSaveBatchProcess(VideoFile videoFile,
-                                                            List<VideoBatchRequest.BatchOperation> operations) {
+                                                                 List<VideoBatchRequest.BatchOperation> operations) {
         VideoProcessingBatch batchProcess = new VideoProcessingBatch();
         batchProcess.setVideoFile(videoFile);
         batchProcess.setStatus(VideoStatusEnum.PROCESSING);
         batchProcess.setCreatedTimes(ZonedDateTime.now());
         batchProcess.setUpdatedTimes(ZonedDateTime.now());
-        batchProcess.setVideoFilePath(null); // valor inicial é nulo
+        batchProcess.setVideoFilePath(null);
         batchProcess.setProcessingSteps(operations.stream().map(VideoBatchRequest.BatchOperation::getOperationType)
                 .collect(Collectors.toList()));
         return videoBatchProcessRepository.save(batchProcess);
@@ -312,7 +344,15 @@ public class VideoBatchService {
         String shortUUID = VideoUtils.generateShortUuid();
         String formattedDate = VideoUtils.formatDateToCompactString(ZonedDateTime.now().toLocalDate());
         String originalFileName = videoFile.getVideoFileName().substring(0,
-                videoFile.getVideoFileName().lastIndexOf(".")); // Remove a extensão
+                videoFile.getVideoFileName().lastIndexOf("."));
         return originalFileName + "_" + shortUUID + formattedDate + "_processed." + outputFormat;
+    }
+
+    private Integer parseInteger(String value) {
+        try {
+            return value == null ? null : Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 }
