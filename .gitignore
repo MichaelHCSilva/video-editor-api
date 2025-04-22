@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+
+### AWS ###
+.aws/
+**/aws-java-sdk-*
+**/aws-sdk-for-*
+**/aws-cli-*
