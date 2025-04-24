@@ -1,31 +1,35 @@
 package com.l8group.videoeditor.utils;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.stream.Collectors;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import com.l8group.videoeditor.enums.OverlayPositionEnum;
 
 public class VideoOverlayUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(VideoOverlayUtils.class);
 
     public static boolean applyTextOverlayWithFFmpeg(String inputFilePath, String outputFilePath, String text,
-                                        OverlayPositionEnum position, int fontSize, String fontFile) {
+                                                     String position, int fontSize, String fontFile) {
         try {
+            if (!VideoOverlayPositionUtils.isValidPosition(position)) {
+                logger.error("Posição inválida: {}", position);
+                return false;
+            }
+
             if (fontFile == null || fontFile.isEmpty()) {
-                // Fonte padrão encontrada pelo FFmpeg
                 fontFile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf";
             }
 
             String drawTextCommand = getDrawTextCommand(text, position, fontSize, fontFile);
 
-            String ffmpegCommand = String.format("ffmpeg -i \"%s\" -vf \"%s\" -c:v libx264 -crf 20 -c:a aac -b:a 256k \"%s\"",
-                    inputFilePath, drawTextCommand, outputFilePath);
+            String ffmpegCommand = String.format(
+                    "ffmpeg -i \"%s\" -vf \"%s\" -c:v libx264 -crf 20 -c:a aac -b:a 256k \"%s\"",
+                    inputFilePath, drawTextCommand, outputFilePath
+            );
 
             logger.info("Executando comando FFmpeg: {}", ffmpegCommand);
 
@@ -33,6 +37,7 @@ public class VideoOverlayUtils {
                 logger.error("Falha ao adicionar marca d'água. Comando: {}", ffmpegCommand);
                 return false;
             }
+
             return true;
         } catch (Exception e) {
             logger.error("Erro ao adicionar marca d'água: {}", e.getMessage(), e);
@@ -40,18 +45,22 @@ public class VideoOverlayUtils {
         }
     }
 
-    private static String getDrawTextCommand(String text, OverlayPositionEnum position, int fontSize, String fontFile) {
+    private static String getDrawTextCommand(String text, String position, int fontSize, String fontFile) {
         String baseText = String.format(
                 "drawtext=fontfile='%s':text='%s':fontsize=%d:box=1:boxcolor=black@0.5:boxborderw=5",
                 fontFile, text, fontSize
         );
 
         String positionText = switch (position) {
-            case TOP_LEFT -> ":x=10:y=10";
-            case TOP_RIGHT -> ":x=w-tw-10:y=10";
-            case BOTTOM_LEFT -> ":x=10:y=h-th-10";
-            case BOTTOM_RIGHT -> ":x=w-tw-10:y=h-th-10";
-            case CENTER -> ":x=(w-text_w)/2:y=(h-text_h)/2";
+            case VideoOverlayPositionUtils.TOP_LEFT -> ":x=10:y=10";
+            case VideoOverlayPositionUtils.TOP_RIGHT -> ":x=w-tw-10:y=10";
+            case VideoOverlayPositionUtils.BOTTOM_LEFT -> ":x=10:y=h-th-10";
+            case VideoOverlayPositionUtils.BOTTOM_RIGHT -> ":x=w-tw-10:y=h-th-10";
+            case VideoOverlayPositionUtils.CENTER -> ":x=(w-text_w)/2:y=(h-text_h)/2";
+            default -> {
+                logger.warn("Posição não reconhecida, usando posição padrão: center");
+                yield ":x=(w-text_w)/2:y=(h-text_h)/2";
+            }
         };
 
         String colorExpression = ":fontcolor=white";
@@ -84,8 +93,4 @@ public class VideoOverlayUtils {
             return false;
         }
     }
-
-
-    
-
 }

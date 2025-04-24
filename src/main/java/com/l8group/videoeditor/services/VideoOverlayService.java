@@ -1,191 +1,159 @@
 package com.l8group.videoeditor.services;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDate;
-import java.time.ZonedDateTime;
-import java.util.UUID;
+import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.exceptions.VideoProcessingException;
+import com.l8group.videoeditor.metrics.VideoOverlayServiceMetrics;
+import com.l8group.videoeditor.models.VideoFile;
+import com.l8group.videoeditor.models.VideoOverlay;
+import com.l8group.videoeditor.rabbit.producer.VideoOverlayProducer;
+import com.l8group.videoeditor.repositories.VideoOverlayRepository;
+import com.l8group.videoeditor.requests.VideoOverlayRequest;
+import com.l8group.videoeditor.utils.FileStorageUtils;
+import com.l8group.videoeditor.utils.VideoFileNameGenerator;
+import com.l8group.videoeditor.utils.VideoOverlayUtils;
+import com.l8group.videoeditor.validation.VideoOverlayValidator;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.l8group.videoeditor.enums.VideoStatusEnum;
-import com.l8group.videoeditor.metrics.VideoOverlayServiceMetrics;
-import com.l8group.videoeditor.models.VideoFile;
-import com.l8group.videoeditor.models.VideoOverlay;
-import com.l8group.videoeditor.rabbit.producer.VideoOverlayProducer;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
-import com.l8group.videoeditor.repositories.VideoOverlayRepository;
-import com.l8group.videoeditor.requests.VideoOverlayRequest;
-import com.l8group.videoeditor.utils.VideoOverlayUtils;
-import com.l8group.videoeditor.utils.VideoUtils;
+import java.io.File;
+import java.time.ZonedDateTime;
+import java.util.UUID;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class VideoOverlayService {
 
-    private static final Logger logger = LoggerFactory.getLogger(VideoOverlayService.class);
-
-    private final VideoFileRepository videoFileRepository;
     private final VideoOverlayRepository videoOverlayRepository;
     private final VideoOverlayProducer videoOverlayProducer;
     private final VideoOverlayServiceMetrics videoOverlayServiceMetrics;
-    private final VideoStatusManagerService videoStatusManagerService; // Adicionado
+    private final VideoStatusManagerService videoStatusManagerService;
+    private final VideoFileFinderService videoFileFinderService;
+    private final VideoOverlayValidator videoOverlayValidator;
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
-    public VideoOverlayService(VideoFileRepository videoFileRepository,
-            VideoOverlayRepository videoOverlayRepository, VideoOverlayProducer videoOverlayProducer,
-            VideoOverlayServiceMetrics videoOverlayServiceMetrics,
-            VideoStatusManagerService videoStatusManagerService) {
-        this.videoFileRepository = videoFileRepository;
-        this.videoOverlayRepository = videoOverlayRepository;
-        this.videoOverlayProducer = videoOverlayProducer;
-        this.videoOverlayServiceMetrics = videoOverlayServiceMetrics;
-        this.videoStatusManagerService = videoStatusManagerService; // Adicionado
-
-    }
-
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String processOverlay(VideoOverlayRequest request, String previousFilePath) {
-        videoOverlayServiceMetrics.incrementOverlayRequests(); // Incrementa a métrica de requisições de overlay
-        logger.info(
-                "Iniciando overlay no vídeo. videoId={}, watermark={}, position={}, fontSize={}, previousFilePath={}",
-                request.getVideoId(), request.getWatermark(), request.getPosition(), request.getFontSize(),
-                previousFilePath);
+        videoOverlayServiceMetrics.incrementOverlayRequests();
+        logRequest(request, previousFilePath);
+
+        validateRequest(request);
 
         UUID videoId = UUID.fromString(request.getVideoId());
+        VideoFile videoFile = videoFileFinderService.findById(videoId);
 
-        // Verifica se o vídeo existe no banco
-        VideoFile videoFile = videoFileRepository.findById(videoId)
-                .orElseThrow(() -> {
-                    logger.error("Vídeo não encontrado para o ID: {}", videoId);
-                    videoOverlayServiceMetrics.incrementOverlayFailure(); // Incrementa falha
-                    return new RuntimeException("Vídeo não encontrado para o ID: " + videoId);
-                });
+        String inputFilePath = FileStorageUtils.resolveInputFilePath(previousFilePath, videoFile.getVideoFilePath());
+        ensureInputFileExists(inputFilePath);
 
-        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getVideoFileName(), videoFile.getVideoFilePath());
-
-        // Determina o arquivo de entrada
-        String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
-                ? previousFilePath
-                : videoFile.getVideoFilePath();
-
-        logger.info("Arquivo de entrada definido como: {}", inputFilePath);
-
-        // Verifica se o arquivo de entrada realmente existe
-        File inputFile = new File(inputFilePath);
-        if (!inputFile.exists()) {
-            logger.error("Arquivo de entrada não encontrado: {}", inputFilePath);
-            videoOverlayServiceMetrics.incrementOverlayFailure(); // Incrementa falha
-            throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
-        }
-
-        String originalFileName = videoFile.getVideoFileName();
-        String shortUUID = VideoUtils.generateShortUuid();
-        String formattedDate = VideoUtils.formatDateToCompactString(LocalDate.now());
-
-        // Nome do arquivo de saída
-        String overlayFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.'))
-                + "_" + shortUUID + formattedDate + "_overlay." + videoFile.getVideoFileFormat().replace(".", "");
-
-        String outputFilePath = Paths.get(TEMP_DIR, overlayFileName).toString();
-        logger.info("Arquivo de saída definido como: {}", outputFilePath);
-
-        // Garante que o diretório temporário existe
-        createTempDirectory();
-
-        // Inicia o temporizador
+        String outputFilePath = prepareOutputFile(videoFile.getVideoFileName());
         var timerSample = videoOverlayServiceMetrics.startOverlayProcessingTimer();
 
-        // Processa o overlay
-        logger.info("Iniciando processamento do overlay: {} → {}", inputFilePath, outputFilePath);
-        boolean success = VideoOverlayUtils.applyTextOverlayWithFFmpeg(
-                inputFilePath, outputFilePath, request.getWatermark(), request.getPosition(), request.getFontSize(),
-                null);
-
-        if (!success) {
-            logger.error("Erro ao processar overlay no vídeo.");
-            videoOverlayServiceMetrics.incrementOverlayFailure(); // Incrementa falha
-            videoOverlayServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
-            throw new RuntimeException("Erro ao processar overlay no vídeo.");
+        try {
+            applyOverlayWithHandling(inputFilePath, outputFilePath, request);
+        } finally {
+            videoOverlayServiceMetrics.recordOverlayProcessingDuration(timerSample);
         }
 
-        // Registra a duração do processo
-        videoOverlayServiceMetrics.recordOverlayProcessingDuration(timerSample);
-        videoOverlayServiceMetrics.incrementOverlaySuccess();
-
-        logger.info("Overlay aplicado com sucesso.");
-
-        // Obtém o tamanho do arquivo gerado e atualiza a métrica
         long fileSize = new File(outputFilePath).length();
         videoOverlayServiceMetrics.setOverlayFileSize(fileSize);
-        logger.info("Tamanho do arquivo com overlay: {} bytes", fileSize);
 
-        VideoOverlay videoOverlay = createAndSaveVideoOverlay(videoFile, request);
-        videoOverlayServiceMetrics.decrementProcessingQueueSize(); // Remove da fila após sucesso
-
-        logger.info("Registro de overlay salvo no banco de dados. ID={}", videoOverlay.getId());
-
-        // Atualizar o status do VideoOverlay após o envio para o RabbitMQ e outras
-        // operações
-        videoStatusManagerService.updateEntityStatus(videoOverlayRepository, videoOverlay.getId(),
-                VideoStatusEnum.COMPLETED, "VideoOverlayService - Conclusão");
+        VideoOverlay videoOverlay = saveOverlayMetadata(videoFile, request);
+        updateStatusToCompleted(videoOverlay.getId());
 
         return outputFilePath;
     }
 
-    private void createTempDirectory() {
-        Path tempDirPath = Paths.get(TEMP_DIR);
-        if (!Files.exists(tempDirPath)) {
-            try {
-                Files.createDirectories(tempDirPath);
-                logger.info("Diretório temporário criado: {}", TEMP_DIR);
-            } catch (IOException e) {
-                logger.error("Erro ao criar diretório temporário: {}", e.getMessage());
-                throw new RuntimeException("Erro ao criar diretório temporário.", e);
-            }
+    private void logRequest(VideoOverlayRequest request, String previousFilePath) {
+        log.info("Overlay Request → videoId={}, watermark='{}', position={}, fontSize={}, previousFilePath={}",
+                request.getVideoId(), request.getWatermark(), request.getPosition(),
+                request.getFontSize(), previousFilePath);
+    }
+
+    private void validateRequest(VideoOverlayRequest request) {
+        try {
+            videoOverlayValidator.validate(request);
+        } catch (IllegalArgumentException e) {
+            videoOverlayServiceMetrics.incrementOverlayFailure();
+            log.warn("Validação falhou para o overlay: {}", e.getMessage());
+            throw e;
         }
     }
 
-    private VideoOverlay createAndSaveVideoOverlay(VideoFile videoFile, VideoOverlayRequest request) {
-        VideoOverlay videoOverlay = new VideoOverlay();
-        videoOverlay.setVideoFile(videoFile);
-        videoOverlay.setCreatedTimes(ZonedDateTime.now());
-        videoOverlay.setUpdatedTimes(ZonedDateTime.now());
-        videoOverlay.setStatus(VideoStatusEnum.PROCESSING);
-        videoOverlay.setOverlayText(request.getWatermark());
-        videoOverlay.setOverlayPosition(request.getPosition());
-        videoOverlay.setOverlayFontSize(request.getFontSize());
-
-        // Salva primeiro para obter o ID
-        videoOverlay = videoOverlayRepository.save(videoOverlay);
-
-        // Envia a mensagem para o RabbitMQ após o salvamento
-        videoOverlayProducer.sendVideoOverlayMessage(videoOverlay.getId().toString());
-
-        return videoOverlay;
+    private void ensureInputFileExists(String inputFilePath) {
+        try {
+            FileStorageUtils.validateInputFileExists(inputFilePath,
+                    videoOverlayServiceMetrics::incrementOverlayFailure);
+        } catch (RuntimeException e) {
+            log.error("Erro ao validar arquivo de entrada: {}", inputFilePath, e);
+            throw new VideoProcessingException("Erro ao validar arquivo de entrada.", e);
+        }
     }
 
-    // Remove arquivos temporários após a consolidação final
-    public void deleteTemporaryFiles(String filePath) {
-        File file = new File(filePath);
-        if (file.exists()) {
-            boolean deleted = file.delete();
-            if (deleted) {
-                logger.info("Arquivo temporário removido com sucesso: {}", filePath);
+    private String prepareOutputFile(String originalFileName) {
+        FileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
+        String outputFile = VideoFileNameGenerator.generateFileNameWithSuffix(originalFileName, "overlay");
+        String fullPath = FileStorageUtils.buildFilePath(TEMP_DIR, outputFile);
+        log.info("Output overlay path: {}", fullPath);
+        return fullPath;
+    }
+
+    private void applyOverlayWithHandling(String inputFile, String outputFile, VideoOverlayRequest request) {
+        try {
+            boolean success = VideoOverlayUtils.applyTextOverlayWithFFmpeg(
+                    inputFile, outputFile, request.getWatermark(), request.getPosition(), request.getFontSize(), null);
+            if (!success) {
+                handleFailure("FFmpeg retornou falha no overlay.");
             } else {
-                logger.error("Falha ao excluir arquivo temporário: {}", filePath);
+                videoOverlayServiceMetrics.incrementOverlaySuccess();
             }
-        } else {
-            logger.warn("Tentativa de remover arquivo inexistente: {}", filePath);
+        } catch (Exception e) {
+            handleFailure("Erro inesperado ao aplicar overlay com FFmpeg.", e);
         }
+    }
+
+    private void handleFailure(String message) {
+        videoOverlayServiceMetrics.incrementOverlayFailure();
+        videoOverlayServiceMetrics.decrementProcessingQueueSize();
+        throw new VideoProcessingException(message);
+    }
+
+    private void handleFailure(String message, Exception e) {
+        videoOverlayServiceMetrics.incrementOverlayFailure();
+        videoOverlayServiceMetrics.decrementProcessingQueueSize();
+        log.error(message, e);
+        throw new VideoProcessingException(message, e);
+    }
+
+    private VideoOverlay saveOverlayMetadata(VideoFile videoFile, VideoOverlayRequest request) {
+        VideoOverlay overlay = new VideoOverlay();
+        overlay.setVideoFile(videoFile);
+        overlay.setCreatedTimes(ZonedDateTime.now());
+        overlay.setUpdatedTimes(ZonedDateTime.now());
+        overlay.setStatus(VideoStatusEnum.PROCESSING);
+        overlay.setOverlayText(request.getWatermark());
+        overlay.setOverlayPosition(request.getPosition());
+        overlay.setOverlayFontSize(request.getFontSize());
+
+        VideoOverlay saved = videoOverlayRepository.save(overlay);
+        videoOverlayProducer.sendVideoOverlayMessage(saved.getId().toString());
+        videoOverlayServiceMetrics.decrementProcessingQueueSize();
+
+        return saved;
+    }
+
+    private void updateStatusToCompleted(UUID overlayId) {
+        videoStatusManagerService.updateEntityStatus(videoOverlayRepository, overlayId,
+                VideoStatusEnum.COMPLETED, "VideoOverlayService - Overlay finalizado com sucesso");
+    }
+
+    public void deleteTemporaryFiles(String filePath) {
+        FileStorageUtils.deleteFileIfExists(new File(filePath));
     }
 }

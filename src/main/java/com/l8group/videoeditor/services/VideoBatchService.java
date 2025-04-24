@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity; // Import ResponseEntity
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -262,7 +261,7 @@ public class VideoBatchService {
                     VideoOverlayRequest overlayRequest = new VideoOverlayRequest();
                     overlayRequest.setVideoId(videoId);
                     overlayRequest.setWatermark(parameters.getWatermark());
-                    overlayRequest.setPosition(parameters.getPosition());
+                    overlayRequest.setPosition(parameters.getPosition()); // Agora String
                     overlayRequest.setFontSize(parameters.getFontSize());
                     Set<ConstraintViolation<VideoOverlayRequest>> violations = validator.validate(overlayRequest);
                     if (!violations.isEmpty()) {

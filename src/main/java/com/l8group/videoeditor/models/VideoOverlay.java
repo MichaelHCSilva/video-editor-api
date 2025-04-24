@@ -3,7 +3,6 @@ package com.l8group.videoeditor.models;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
-import com.l8group.videoeditor.enums.OverlayPositionEnum;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 
 import jakarta.persistence.*;
@@ -37,9 +36,8 @@ public class VideoOverlay {
     @Column(name = "overlay_text", columnDefinition = "TEXT", nullable = false)
     private String overlayText;
 
-    @Enumerated(EnumType.STRING)
     @Column(name = "overlay_position", nullable = false)
-    private OverlayPositionEnum overlayPosition;
+    private String overlayPosition; 
 
     @Column(name = "overlay_font_size", nullable = false)
     private Integer overlayFontSize;

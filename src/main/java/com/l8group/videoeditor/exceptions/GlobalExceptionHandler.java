@@ -8,6 +8,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+
 import java.nio.file.AccessDeniedException;
 import java.util.stream.Collectors;
 
@@ -101,10 +103,15 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
-    // Adicione este handler para a sua InvalidVideoIdListException
     @ExceptionHandler(InvalidVideoIdListException.class)
     public ResponseEntity<ErrorResponse> handleInvalidVideoIdListException(InvalidVideoIdListException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidFormat(HttpMessageNotReadableException ex) {
+        String message = "Erro na leitura da requisição: verifique se todos os campos estão com os tipos corretos.";
+        return buildResponse(HttpStatus.BAD_REQUEST, message);
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, String message) {

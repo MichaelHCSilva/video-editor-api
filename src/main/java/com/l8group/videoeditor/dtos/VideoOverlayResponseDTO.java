@@ -1,6 +1,5 @@
 package com.l8group.videoeditor.dtos;
 
-import com.l8group.videoeditor.enums.OverlayPositionEnum;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,6 +9,6 @@ import lombok.Data;
 public class VideoOverlayResponseDTO {
     private UUID id;
     private String watermark;
-    private OverlayPositionEnum position;
+    private String position; 
     private Integer fontSize;
 }

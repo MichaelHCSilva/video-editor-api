@@ -1,4 +1,4 @@
-package com.l8group.videoeditor.enums;
+/*package com.l8group.videoeditor.enums;
 
 public enum OverlayPositionEnum {
     TOP_LEFT("top-left"),
@@ -16,4 +16,4 @@ public enum OverlayPositionEnum {
     public String getPosition() {
         return position;
     }
-}
+}*/
