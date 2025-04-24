@@ -1,154 +1,110 @@
 package com.l8group.videoeditor.services;
 
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.time.LocalDate;
-import java.time.ZonedDateTime;
-import java.util.UUID;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.exceptions.VideoProcessingException;
 import com.l8group.videoeditor.metrics.VideoConversionServiceMetrics;
 import com.l8group.videoeditor.models.VideoConversion;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoConversionProducer;
 import com.l8group.videoeditor.repositories.VideoConversionRepository;
-import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
+import com.l8group.videoeditor.utils.FileStorageUtils;
+import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
-import com.l8group.videoeditor.utils.VideoUtils;
-
+import com.l8group.videoeditor.validation.VideoConversionValidator;
 import io.micrometer.core.instrument.Timer;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.io.File;
+import java.time.ZonedDateTime;
+import java.util.UUID;
+
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class VideoConversionService {
 
-    private static final Logger logger = LoggerFactory.getLogger(VideoConversionService.class);
-
-    private final VideoFileRepository videoFileRepository;
+    private final VideoFileFinderService videoFileFinderService;
     private final VideoConversionRepository videoConversionRepository;
     private final VideoConversionProducer videoConversionProducer;
     private final VideoConversionServiceMetrics videoConversionServiceMetrics;
-    private final VideoStatusManagerService videoStatusManagerService; // Adicionado
-
+    private final VideoStatusManagerService videoStatusManagerService;
+    private final VideoConversionValidator videoConversionValidator;
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
-    public VideoConversionService(VideoFileRepository videoFileRepository, VideoConversionRepository videoConversionRepository,
-                                  VideoConversionProducer videoConversionProducer, VideoConversionServiceMetrics videoConversionServiceMetrics, VideoStatusManagerService videoStatusManagerService) {
-        this.videoFileRepository = videoFileRepository;
-        this.videoConversionRepository = videoConversionRepository;
-        this.videoConversionProducer = videoConversionProducer;
-        this.videoConversionServiceMetrics = videoConversionServiceMetrics;
-        this.videoStatusManagerService = videoStatusManagerService; // Adicionado
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW) 
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String convertVideo(VideoConversionRequest request, String previousFilePath) {
-
-        videoConversionServiceMetrics.incrementConversionRequests(); // Incrementa solicitações de conversão
-        videoConversionServiceMetrics.incrementProcessingQueueSize(); // Incrementa a fila de processamento
-
-        Timer.Sample timer = videoConversionServiceMetrics.startConversionTimer(); // Inicia o temporizador
-
-
-        logger.info("Iniciando conversão de vídeo. videoId={}, outputFormat={}, previousFilePath={}",
-                request.getVideoId(), request.getOutputFormat(), previousFilePath);
+        videoConversionServiceMetrics.incrementConversionRequests();
+        videoConversionServiceMetrics.incrementProcessingQueueSize();
+        Timer.Sample timer = videoConversionServiceMetrics.startConversionTimer();
 
         UUID videoId = UUID.fromString(request.getVideoId());
         String outputFormat = request.getOutputFormat();
 
-        // Busca o vídeo no banco
-        VideoFile videoFile = videoFileRepository.findById(videoId)
-                .orElseThrow(() -> {
-                    logger.error("Vídeo não encontrado para o ID: {}", videoId);
-                    videoConversionServiceMetrics.incrementConversionFailure(); // Incrementa falha
-                    videoConversionServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
-                    return new RuntimeException("Vídeo não encontrado para o ID: " + videoId);
-                });
+        videoConversionValidator.validateVideoId(request.getVideoId());
+        videoConversionValidator.validateOutputFormat(request.getOutputFormat());
 
-        logger.info("Vídeo encontrado: {} (caminho: {})", videoFile.getVideoFileName(), videoFile.getVideoFilePath());
+        log.info("Iniciando conversão do vídeo com ID: {}, para o formato: {}, arquivo de origem: {}",
+                videoId, outputFormat, previousFilePath);
 
-        // Determina o arquivo de entrada
-        String inputFilePath = (previousFilePath != null && !previousFilePath.isEmpty())
-                ? previousFilePath
-                : videoFile.getVideoFilePath();
+        VideoFile videoFile = videoFileFinderService.findById(videoId);
+        String inputFilePath = FileStorageUtils.resolveInputFilePath(previousFilePath, videoFile.getVideoFilePath());
 
-        logger.info("Arquivo de entrada definido como: {}", inputFilePath);
-
-        // Verifica se o arquivo de entrada realmente existe
-        File inputFile = new File(inputFilePath);
-        if (!inputFile.exists()) {
-            logger.error("Arquivo de entrada não encontrado: {}", inputFilePath);
-            videoConversionServiceMetrics.incrementConversionFailure(); // Incrementa falha
-            videoConversionServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
-            throw new RuntimeException("Arquivo de entrada não encontrado: " + inputFilePath);
+        try {
+            FileStorageUtils.validateInputFileExists(inputFilePath, () -> {
+                videoConversionServiceMetrics.incrementConversionFailure();
+                videoConversionServiceMetrics.decrementProcessingQueueSize();
+                log.error("Arquivo de entrada não encontrado: {}", inputFilePath);
+            });
+        } catch (RuntimeException e) {
+            log.error("Erro ao validar arquivo de entrada: {}", inputFilePath, e);
+            throw new VideoProcessingException("Erro ao processar o vídeo: arquivo de origem não encontrado.", e);
         }
 
-        String originalFileName = videoFile.getVideoFileName();
-        String shortUUID = VideoUtils.generateShortUuid();
-        String formattedDate = VideoUtils.formatDateToCompactString(LocalDate.now());
+        FileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
+        String outputFileName = VideoFileNameGenerator.generateFileNameWithSuffix(videoFile.getVideoFileName(),
+                "convert");
+        String outputFilePath = FileStorageUtils.buildFilePath(TEMP_DIR, outputFileName);
 
-        // Geração do nome do arquivo convertido
-        String baseFileName = originalFileName.substring(0, originalFileName.lastIndexOf('.')); // Nome sem extensão
-        String convertedFileName = baseFileName + "_" + shortUUID + formattedDate + "_convert." + outputFormat;
+        log.info("Processando conversão: {} → {} (Formato: {})", inputFilePath, outputFilePath, outputFormat);
 
-        String outputFilePath = Paths.get(TEMP_DIR, convertedFileName).toString();
-        logger.info("Arquivo de saída definido como: {}", outputFilePath);
-
-        // Garante que o diretório temporário existe
-        createTempDirectory();
-
-        // Inicia o processo de conversão
-        logger.info("Iniciando conversão do vídeo: {} → {} (Formato: {})", inputFilePath, outputFilePath, outputFormat);
         boolean success = VideoProcessorUtils.convertVideo(inputFilePath, outputFilePath, outputFormat);
-
         if (!success) {
-            logger.error("Falha ao converter o vídeo para o formato {}", outputFormat);
-            videoConversionServiceMetrics.incrementConversionFailure(); // Incrementa falha
-            videoConversionServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
-            throw new RuntimeException("Falha ao converter o vídeo para o formato " + outputFormat);
+            handleConversionFailure(outputFormat);
         }
-        long fileSize = new File(outputFilePath).length();
-        videoConversionServiceMetrics.setConvertedFileSize(fileSize); // Define o tamanho do arquivo convertido
 
-        videoConversionServiceMetrics.recordConversionDuration(timer); // Registra a duração da conversão
-        videoConversionServiceMetrics.incrementConversionSuccess(); // Incrementa sucesso
-        videoConversionServiceMetrics.decrementProcessingQueueSize(); // Remove da fila
+        postConversionSuccess(timer, outputFilePath);
 
-        // Salva as informações da conversão no banco de dados
         VideoConversion videoConversion = createAndSaveVideoConversion(videoFile, outputFormat);
-        logger.info("Registro de conversão salvo no banco de dados. ID={}", videoConversion.getId());
-
-         // Atualizar o status do VideoConversion após o envio para o RabbitMQ e outras operações
         videoStatusManagerService.updateEntityStatus(videoConversionRepository, videoConversion.getId(),
-        VideoStatusEnum.COMPLETED, "VideoConversionService - Conclusão");
+                VideoStatusEnum.COMPLETED, "Conversão concluída com sucesso.");
 
+        log.info("Conversão do vídeo {} para o formato {} concluída. Arquivo de saída: {}",
+                videoId, outputFormat, outputFilePath);
 
         return outputFilePath;
     }
 
-    private void createTempDirectory() {
-        Path tempDirPath = Paths.get(TEMP_DIR);
-        if (!Files.exists(tempDirPath)) {
-            try {
-                Files.createDirectories(tempDirPath);
-                logger.info("Diretório temporário criado: {}", TEMP_DIR);
-            } catch (IOException e) {
-                logger.error("Erro ao criar diretório temporário: {}", e.getMessage());
-                throw new RuntimeException("Erro ao criar diretório temporário.", e);
-            }
-        }
+    private void handleConversionFailure(String outputFormat) {
+        log.error("Falha ao converter o vídeo para o formato {}", outputFormat);
+        videoConversionServiceMetrics.incrementConversionFailure();
+        videoConversionServiceMetrics.decrementProcessingQueueSize();
+        throw new RuntimeException("Falha ao converter o vídeo para o formato " + outputFormat);
+    }
+
+    private void postConversionSuccess(Timer.Sample timer, String outputFilePath) {
+        long fileSize = new File(outputFilePath).length();
+        videoConversionServiceMetrics.setConvertedFileSize(fileSize);
+        videoConversionServiceMetrics.recordConversionDuration(timer);
+        videoConversionServiceMetrics.incrementConversionSuccess();
+        videoConversionServiceMetrics.decrementProcessingQueueSize();
     }
 
     private VideoConversion createAndSaveVideoConversion(VideoFile videoFile, String outputFormat) {
@@ -160,27 +116,12 @@ public class VideoConversionService {
         videoConversion.setUpdatedTimes(ZonedDateTime.now());
         videoConversion.setStatus(VideoStatusEnum.PROCESSING);
 
-        // Salva primeiro para obter o ID
         videoConversion = videoConversionRepository.save(videoConversion);
-
-        // Envia a mensagem para o RabbitMQ após o salvamento
         videoConversionProducer.sendVideoConversionMessage(videoConversion.getId().toString());
-
         return videoConversion;
     }
 
-    // Remove arquivos temporários após a consolidação final
     public void deleteTemporaryFiles(String filePath) {
-        File file = new File(filePath);
-        if (file.exists()) {
-            boolean deleted = file.delete();
-            if (deleted) {
-                logger.info("Arquivo temporário removido com sucesso: {}", filePath);
-            } else {
-                logger.error("Falha ao excluir arquivo temporário: {}", filePath);
-            }
-        } else {
-            logger.warn("Tentativa de remover arquivo inexistente: {}", filePath);
-        }
+        FileStorageUtils.deleteFileIfExists(new File(filePath));
     }
 }

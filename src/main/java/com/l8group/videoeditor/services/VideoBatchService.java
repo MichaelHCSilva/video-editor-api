@@ -37,6 +37,7 @@ import com.l8group.videoeditor.requests.VideoCutRequest;
 import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoUtils;
+import com.l8group.videoeditor.validation.VideoConversionValidator;
 import com.l8group.videoeditor.validation.VideoResizeValidator;
 
 import io.micrometer.core.instrument.Timer;
@@ -61,6 +62,7 @@ public class VideoBatchService {
     private final VideoStatusManagerService videoStatusManagerService;
     private final S3Service s3Service;
     private final Validator validator;
+    private final VideoConversionValidator videoConversionValidator;
 
     private static final Logger logger = LoggerFactory.getLogger(VideoBatchService.class);
 
@@ -275,17 +277,14 @@ public class VideoBatchService {
                 case "CONVERT" -> {
                     VideoConversionRequest convertRequest = new VideoConversionRequest();
                     convertRequest.setVideoId(videoId);
-                    convertRequest.setOutputFormat(outputFormat);
-                    Set<ConstraintViolation<VideoConversionRequest>> violations = validator.validate(convertRequest);
-                    if (!violations.isEmpty()) {
-                        String errorMessages = violations.stream()
-                                .map(ConstraintViolation::getMessage)
-                                .collect(Collectors.joining(", "));
-                        throw new IllegalArgumentException("Erros na requisição de conversão: " + errorMessages);
-                    }
+                    convertRequest.setOutputFormat(parameters.getOutputFormat()); // Usar o outputFormat do parameters
+
+                    // Validar o formato de saída usando VideoConversionValidator
+                    videoConversionValidator.validateOutputFormat(convertRequest.getOutputFormat());
+
                     yield videoConversionService.convertVideo(convertRequest, currentInputFilePath);
                 }
-                default -> throw new IllegalArgumentException("Operação inválida: " + operation.getOperationType());
+                default -> throw new IllegalArgumentException("Operação inválida: " + operation.getOperationType()+ ". Os tipos suportados são: CUT, RESIZE, CONVERT e OVERLAY.");
             };
 
             logger.info("✅ [executeOperation] Operação concluída: {} | Arquivo de saída: {}",
@@ -294,6 +293,9 @@ public class VideoBatchService {
 
         } catch (InvalidResizeParameterException e) {
             logger.error("❌ [executeOperation] Erro de validação de redimensionamento: {}", e.getMessage());
+            throw e;
+        } catch (IllegalArgumentException e) {
+            logger.error("❌ [executeOperation] Erro de argumento inválido: {}", e.getMessage());
             throw e;
         } catch (Exception e) {
             logger.error("❌ [executeOperation] Erro ao executar operação: {}", operation.getOperationType(), e);

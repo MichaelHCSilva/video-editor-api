@@ -2,12 +2,10 @@ package com.l8group.videoeditor.requests;
 
 import com.l8group.videoeditor.utils.VideoOverlayPositionUtils;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotBlank;
+
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import java.util.List;
 import lombok.Data;
 
@@ -47,15 +45,10 @@ public class VideoBatchRequest {
 
         private String outputFormat; // Para CONVERT
 
-        @NotBlank(message = "O texto da marca d'água é obrigatório e não pode estar em branco.")
-        @Size(min = 1, max = 50, message = "O texto da marca d'água deve ter entre 1 e 50 caracteres.")
         private String watermark; // Para OVERLAY
 
-        @NotBlank(message = "A posição da sobreposição é obrigatória e não pode estar em branco.")
         private String position; // Para OVERLAY
 
-        @NotNull(message = "O tamanho da fonte é obrigatório e deve ser maior que 0.")
-        @Min(value = 1, message = "O tamanho da fonte deve ser maior que 0.")
         private Integer fontSize; // Para OVERLAY
 
         // Validação customizada para garantir que a posição da overlay é válida

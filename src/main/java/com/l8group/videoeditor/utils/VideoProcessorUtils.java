@@ -25,6 +25,7 @@ public class VideoProcessorUtils {
                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                 "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
+                "-map_metadata", "0", // Adicionado para preservar metadados
                 outputFilePath);
 
         if (success) {
@@ -47,6 +48,7 @@ public class VideoProcessorUtils {
                 "-c:v", "libx264", "-preset", "slow", "-crf", "23",
                 "-c:a", "aac", "-b:a", "192k",
                 "-movflags", "+faststart",
+                "-map_metadata", "0", // Adicionado para preservar metadados
                 outputFilePath);
 
         if (success) {
@@ -70,6 +72,7 @@ public class VideoProcessorUtils {
                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                 "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
+                "-map_metadata", "0", // Adicionado para preservar metadados
                 outputFilePath);
 
         if (success) {
@@ -85,7 +88,7 @@ public class VideoProcessorUtils {
      */
     private static boolean executeFFmpegCommand(String... command) {
         logger.info("Executando comando FFmpeg: {}", String.join(" ", command));
-        
+
         try {
             ProcessBuilder processBuilder = new ProcessBuilder(command);
             processBuilder.redirectErrorStream(true);

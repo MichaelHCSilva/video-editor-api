@@ -36,6 +36,11 @@ public class GlobalExceptionHandler {
         return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidRequest(InvalidRequestException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
         String errorMessage = "Requisição inválida. Verifique os dados enviados.";

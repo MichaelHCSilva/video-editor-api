@@ -21,7 +21,6 @@ import org.springframework.web.multipart.MultipartFile;
 import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileListDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
-import com.l8group.videoeditor.exceptions.InvalidCutTimeException;
 import com.l8group.videoeditor.requests.VideoBatchRequest;
 import com.l8group.videoeditor.responses.ErrorResponse;
 import com.l8group.videoeditor.services.VideoBatchService;
