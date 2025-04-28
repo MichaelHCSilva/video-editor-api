@@ -13,7 +13,7 @@ import com.l8group.videoeditor.config.RabbitMQConfig;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
-import com.l8group.videoeditor.services.S3Service;
+import com.l8group.videoeditor.services.VideoS3Service;
 import com.l8group.videoeditor.services.VideoStatusManagerService;
 
 import lombok.RequiredArgsConstructor;
@@ -25,7 +25,7 @@ public class VideoProcessingConsumer extends AbstractRetryConsumer {
     private static final Logger logger = LoggerFactory.getLogger(VideoProcessingConsumer.class);
 
     private final VideoFileRepository videoFileRepository;
-    private final S3Service s3Service;
+    private final VideoS3Service s3Service;
     private final VideoStatusManagerService videoStatusManagerService;
 
     @RabbitListener(queues = RabbitMQConfig.VIDEO_PROCESSING_QUEUE)

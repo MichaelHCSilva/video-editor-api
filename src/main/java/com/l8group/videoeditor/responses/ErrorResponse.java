@@ -2,13 +2,16 @@ package com.l8group.videoeditor.responses;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+import java.util.List;
 
 @Data
+@NoArgsConstructor
 @AllArgsConstructor
 public class ErrorResponse {
-    private String message;
+    private List<String> errors;
 
-    public static ErrorResponse of(String message) {
-        return new ErrorResponse(message);
+    public static ErrorResponse of(List<String> errors) {
+        return new ErrorResponse(errors);
     }
 }

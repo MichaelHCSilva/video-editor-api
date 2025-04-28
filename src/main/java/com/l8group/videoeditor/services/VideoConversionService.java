@@ -8,7 +8,7 @@ import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoConversionProducer;
 import com.l8group.videoeditor.repositories.VideoConversionRepository;
 import com.l8group.videoeditor.requests.VideoConversionRequest;
-import com.l8group.videoeditor.utils.FileStorageUtils;
+import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.validation.VideoConversionValidator;
@@ -55,10 +55,10 @@ public class VideoConversionService {
                 videoId, outputFormat, previousFilePath);
 
         VideoFile videoFile = videoFileFinderService.findById(videoId);
-        String inputFilePath = FileStorageUtils.resolveInputFilePath(previousFilePath, videoFile.getVideoFilePath());
+        String inputFilePath = VideoFileStorageUtils.resolveInputFilePath(previousFilePath, videoFile.getVideoFilePath());
 
         try {
-            FileStorageUtils.validateInputFileExists(inputFilePath, () -> {
+            VideoFileStorageUtils.validateInputFileExists(inputFilePath, () -> {
                 videoConversionServiceMetrics.incrementConversionFailure();
                 videoConversionServiceMetrics.decrementProcessingQueueSize();
                 log.error("Arquivo de entrada não encontrado: {}", inputFilePath);
@@ -68,10 +68,10 @@ public class VideoConversionService {
             throw new VideoProcessingException("Erro ao processar o vídeo: arquivo de origem não encontrado.", e);
         }
 
-        FileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
+        VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
         String outputFileName = VideoFileNameGenerator.generateFileNameWithSuffix(videoFile.getVideoFileName(),
                 "convert");
-        String outputFilePath = FileStorageUtils.buildFilePath(TEMP_DIR, outputFileName);
+        String outputFilePath = VideoFileStorageUtils.buildFilePath(TEMP_DIR, outputFileName);
 
         log.info("Processando conversão: {} → {} (Formato: {})", inputFilePath, outputFilePath, outputFormat);
 
@@ -122,6 +122,6 @@ public class VideoConversionService {
     }
 
     public void deleteTemporaryFiles(String filePath) {
-        FileStorageUtils.deleteFileIfExists(new File(filePath));
+        VideoFileStorageUtils.deleteFileIfExists(new File(filePath));
     }
 }

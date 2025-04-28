@@ -32,7 +32,8 @@ public class VideoOverlayValidator {
                     .map(violation -> String.format("[%s: %s]", violation.getPropertyPath(), violation.getMessage()))
                     .collect(Collectors.joining(", "));
             log.warn("Erro na validação da requisição de overlay: {}", errorMessage);
-            throw new ConstraintViolationException("Erro na validação da requisição de overlay: " + errorMessage, violations);
+            throw new ConstraintViolationException("Erro na validação da requisição de overlay: " + errorMessage,
+                    violations);
         }
 
         validateCustomFields(request);
@@ -40,9 +41,6 @@ public class VideoOverlayValidator {
 
     private void validateCustomFields(VideoOverlayRequest request) {
         validateWatermark(request.getWatermark());
-
-        // Só valida posição customizada se o método utilitário for mais complexo que o @Pattern
-        // validatePosition(request.getPosition());
 
         validateFontSize(request.getFontSize());
     }
@@ -64,7 +62,8 @@ public class VideoOverlayValidator {
     }
 
     private boolean containsInvalidCharacters(String text) {
-        if (text == null) return false;
+        if (text == null)
+            return false;
         // Permite letras, números e espaços de qualquer idioma
         Pattern pattern = Pattern.compile("[^\\p{L}\\p{N}\\s]");
         return pattern.matcher(text).find();

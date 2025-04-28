@@ -25,7 +25,7 @@ public class VideoConversionValidator {
             throw new InvalidRequestException("O formato de saída não pode ser vazio.");
         }
         if (!Pattern.matches("^(mp4|avi|mov)$", outputFormat.toLowerCase())) {
-            throw new InvalidRequestException("Formato de saída inválido. Formatos suportados: mp4, avi, mov.");
+            throw new InvalidRequestException("Formatos suportados: mp4, avi, mov.");
         }
     }
 

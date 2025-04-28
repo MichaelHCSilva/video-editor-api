@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
-import com.l8group.videoeditor.services.S3Service;
+import com.l8group.videoeditor.services.VideoS3Service;
 import com.l8group.videoeditor.services.VideoStatusManagerService;
 
 @Component
@@ -26,10 +26,10 @@ public class VideoRetryScheduler {
     private int maxRetries;
 
     private final VideoFileRepository videoFileRepository;
-    private final S3Service s3Service;
+    private final VideoS3Service s3Service;
     private final VideoStatusManagerService videoStatusManagerService;
 
-    public VideoRetryScheduler(VideoFileRepository videoFileRepository, S3Service s3Service,
+    public VideoRetryScheduler(VideoFileRepository videoFileRepository, VideoS3Service s3Service,
                                VideoStatusManagerService videoStatusManagerService) {
         this.videoFileRepository = videoFileRepository;
         this.s3Service = s3Service;

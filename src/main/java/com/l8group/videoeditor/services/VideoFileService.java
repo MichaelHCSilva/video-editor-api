@@ -21,7 +21,7 @@ import com.l8group.videoeditor.metrics.VideoFileServiceMetrics;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoProcessingProducer;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
-import com.l8group.videoeditor.utils.FileStorageUtils;
+import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.validation.VideoValidationExecutor;
@@ -56,9 +56,9 @@ public class VideoFileService {
 
             String originalFileName = file.getOriginalFilename();
             String newFileName = VideoFileNameGenerator.generateUniqueFileName(originalFileName);
-            String finalFilePath = FileStorageUtils.buildFilePath(STORAGE_DIR, newFileName);
+            String finalFilePath = VideoFileStorageUtils.buildFilePath(STORAGE_DIR, newFileName);
 
-            FileStorageUtils.createDirectoryIfNotExists(STORAGE_DIR);
+            VideoFileStorageUtils.createDirectoryIfNotExists(STORAGE_DIR);
 
             tempFile = File.createTempFile("upload_", "_" + originalFileName);
             file.transferTo(tempFile);
@@ -67,7 +67,7 @@ public class VideoFileService {
             VideoValidationExecutor.validateWithFFmpeg(tempFile.getAbsolutePath());
 
             Path targetPath = Path.of(finalFilePath);
-            FileStorageUtils.moveFile(tempFile.toPath(), targetPath);
+            VideoFileStorageUtils.moveFile(tempFile.toPath(), targetPath);
 
             VideoFile videoFile = createVideoEntity(file, finalFilePath, newFileName);
             videoFile = videoFileRepository.save(videoFile);
@@ -87,7 +87,7 @@ public class VideoFileService {
             log.error("Erro durante upload de vídeo: {}", e.getMessage(), e);
             throw e;
         } finally {
-            FileStorageUtils.deleteFileIfExists(tempFile);
+            VideoFileStorageUtils.deleteFileIfExists(tempFile);
         }
     }
 

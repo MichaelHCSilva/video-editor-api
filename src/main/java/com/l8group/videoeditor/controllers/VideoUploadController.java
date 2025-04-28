@@ -1,5 +1,6 @@
 package com.l8group.videoeditor.controllers;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -69,16 +70,12 @@ public class VideoUploadController {
     }
 
     @PostMapping("/batch-process")
-    public ResponseEntity<?> processBatch(@Valid @RequestBody VideoBatchRequest request) {
-        log.info("Recebida solicitação de processamento em lote: {}", request);
-        try {
-            VideoBatchResponseDTO response = videoBatchService.processBatch(request);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            log.error("Erro ao processar vídeo em lote: {}", e.getMessage(), e);
-            throw e;
-        }
-    }
+public ResponseEntity<?> processBatch(@Valid @RequestBody VideoBatchRequest request) throws IOException {  // Adicionando o lançamento de IOException
+    log.info("Recebida solicitação de processamento em lote: {}", request);
+    VideoBatchResponseDTO response = videoBatchService.processBatch(request);
+    return ResponseEntity.ok(response);
+}
+
 
     @GetMapping("/download/{batchProcessId}")
     public ResponseEntity<?> downloadVideo(@PathVariable UUID batchProcessId) {
@@ -91,7 +88,7 @@ public class VideoUploadController {
         } catch (Exception e) {
             log.error("Erro ao fazer download do vídeo com ID {}", batchProcessId, e);
             return ResponseEntity.status(404)
-                    .body(new ErrorResponse("Vídeo não encontrado: " + e.getMessage()));
+                    .body(ErrorResponse.of(List.of("Vídeo não encontrado: " + e.getMessage())));
         }
     }
 

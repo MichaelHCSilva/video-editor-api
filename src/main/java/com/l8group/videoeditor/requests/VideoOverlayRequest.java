@@ -15,10 +15,7 @@ import lombok.NoArgsConstructor;
 public class VideoOverlayRequest {
 
     @NotBlank(message = "O ID do vídeo é obrigatório e não pode estar em branco.")
-    @Pattern(
-        regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
-        message = "O ID do vídeo deve ser um UUID válido no formato 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'."
-    )
+    @Pattern(regexp = "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", message = "O ID do vídeo deve ser um UUID válido no formato 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'.")
     private String videoId;
 
     @NotBlank(message = "O texto da marca d'água é obrigatório e não pode estar em branco.")
@@ -26,10 +23,7 @@ public class VideoOverlayRequest {
     private String watermark;
 
     @NotBlank(message = "A posição da sobreposição é obrigatória e não pode estar em branco.")
-    @Pattern(
-        regexp = "top-left|top-right|bottom-left|bottom-right|center",
-        message = "A posição da sobreposição deve ser uma das seguintes: top-left, top-right, bottom-left, bottom-right, center."
-    )
+    @Pattern(regexp = "top-left|top-right|bottom-left|bottom-right|center", message = "A posição da sobreposição deve ser uma das seguintes: top-left, top-right, bottom-left, bottom-right, center.")
     private String position;
 
     @NotNull(message = "O tamanho da fonte é obrigatório e não pode ser nulo.")
