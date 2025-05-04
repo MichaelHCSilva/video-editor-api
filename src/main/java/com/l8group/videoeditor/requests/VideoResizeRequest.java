@@ -18,7 +18,7 @@ public class VideoResizeRequest {
 
     @NotBlank(message = "O ID do vídeo é obrigatório.")
     private String videoId;
- 
+
     @NotNull(message = "A largura é obrigatória.")
     @Positive(message = "A largura deve ser um número positivo.")
     private Integer width;

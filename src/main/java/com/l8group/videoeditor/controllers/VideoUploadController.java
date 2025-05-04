@@ -9,6 +9,7 @@ import java.util.UUID;
 
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -43,20 +44,44 @@ public class VideoUploadController {
     private final VideoDownloadService videoDownloadService;
 
     @PostMapping("/upload")
-    public ResponseEntity<Map<String, Object>> upload(@RequestParam("file") List<MultipartFile> files) {
+    public ResponseEntity<Map<String, Object>> upload(
+            @RequestParam(value = "file", required = false) List<MultipartFile> files) {
+
         List<VideoFileResponseDTO> successList = new ArrayList<>();
         List<Map<String, String>> errorList = new ArrayList<>();
 
-        for (MultipartFile file : files) {
-            try {
-                VideoFileResponseDTO response = videoFileService.uploadVideo(file);
-                successList.add(response);
-            } catch (Exception e) {
-                log.error("Erro ao fazer upload do vídeo '{}': {}", file.getOriginalFilename(), e.getMessage(), e);
-                Map<String, String> errorMap = new HashMap<>();
-                errorMap.put("fileName", file.getOriginalFilename());
-                errorMap.put("error", e.getMessage());
-                errorList.add(errorMap);
+        if (files == null || files.isEmpty()) {
+            errorList.add(Map.of("error", "O campo 'file' é obrigatório e deve conter pelo menos um arquivo."));
+        } else {
+            for (MultipartFile file : files) {
+                try {
+                    if (file == null || file.isEmpty()) {
+                        throw new IllegalArgumentException("O arquivo enviado está vazio.");
+                    }
+
+                    if (!file.getContentType().startsWith("video/")) {
+                        throw new IllegalArgumentException(
+                                "O arquivo enviado não é um vídeo válido e não pode ser processado.");
+                    }
+
+                    VideoFileResponseDTO response = videoFileService.uploadVideo(file);
+                    successList.add(response);
+
+                } catch (Exception e) {
+                    Map<String, String> errorMap = new HashMap<>();
+
+                    String fileName = (file != null && file.getOriginalFilename() != null
+                            && !file.getOriginalFilename().isBlank())
+                                    ? file.getOriginalFilename()
+                                    : null;
+
+                    if (fileName != null) {
+                        errorMap.put("fileName", fileName);
+                    }
+
+                    errorMap.put("error", e.getMessage());
+                    errorList.add(errorMap);
+                }
             }
         }
 
@@ -66,16 +91,16 @@ public class VideoUploadController {
         if (!errorList.isEmpty())
             result.put("errors", errorList);
 
-        return ResponseEntity.ok(result);
+        HttpStatus status = successList.isEmpty() ? HttpStatus.BAD_REQUEST : HttpStatus.CREATED;
+        return ResponseEntity.status(status).body(result);
     }
 
     @PostMapping("/batch-process")
-public ResponseEntity<?> processBatch(@Valid @RequestBody VideoBatchRequest request) throws IOException {  // Adicionando o lançamento de IOException
-    log.info("Recebida solicitação de processamento em lote: {}", request);
-    VideoBatchResponseDTO response = videoBatchService.processBatch(request);
-    return ResponseEntity.ok(response);
-}
-
+    public ResponseEntity<?> processBatch(@Valid @RequestBody VideoBatchRequest request) throws IOException {
+        log.info("Recebida solicitação de processamento em lote: {}", request); 
+        VideoBatchResponseDTO response = videoBatchService.processBatch(request);
+        return ResponseEntity.ok(response);
+    }
 
     @GetMapping("/download/{batchProcessId}")
     public ResponseEntity<?> downloadVideo(@PathVariable UUID batchProcessId) {

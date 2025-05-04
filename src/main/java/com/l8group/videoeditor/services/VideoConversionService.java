@@ -22,7 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.time.ZonedDateTime;
-import java.util.UUID;
+import java.nio.file.Paths;
+
 
 @Slf4j
 @Service
@@ -45,11 +46,11 @@ public class VideoConversionService {
         videoConversionServiceMetrics.incrementProcessingQueueSize();
         Timer.Sample timer = videoConversionServiceMetrics.startConversionTimer();
 
-        UUID videoId = UUID.fromString(request.getVideoId());
+        String videoId = request.getVideoId();
         String outputFormat = request.getOutputFormat();
 
-        videoConversionValidator.validateVideoId(request.getVideoId());
-        videoConversionValidator.validateOutputFormat(request.getOutputFormat());
+        videoConversionValidator.validateVideoId(videoId);
+        videoConversionValidator.validateOutputFormat(outputFormat);
 
         log.info("Iniciando conversão do vídeo com ID: {}, para o formato: {}, arquivo de origem: {}",
                 videoId, outputFormat, previousFilePath);
@@ -69,28 +70,36 @@ public class VideoConversionService {
         }
 
         VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
-        String outputFileName = VideoFileNameGenerator.generateFileNameWithSuffix(videoFile.getVideoFileName(),
-                "convert");
-        String outputFilePath = VideoFileStorageUtils.buildFilePath(TEMP_DIR, outputFileName);
+        String outputFileNameWithSuffix = VideoFileNameGenerator.generateFileNameWithSuffix(videoFile.getVideoFileName(), "convert");
+        String outputFilePathWithSuffix = VideoFileStorageUtils.buildFilePath(TEMP_DIR, outputFileNameWithSuffix);
 
-        log.info("Processando conversão: {} → {} (Formato: {})", inputFilePath, outputFilePath, outputFormat);
+        // Obter o nome do arquivo base (com o sufixo _CONVERT, mas sem a extensão original)
+        String baseOutputFileNameWithSuffix = Paths.get(outputFilePathWithSuffix).getFileName().toString();
+        // Remover a extensão original, se houver (ex: .mp4, .avi)
+        int lastDotIndex = baseOutputFileNameWithSuffix.lastIndexOf('.');
+        String baseOutputFileNameWithoutExtension = (lastDotIndex == -1) ? baseOutputFileNameWithSuffix : baseOutputFileNameWithSuffix.substring(0, lastDotIndex);
+        String outputFilePathWithoutExtension = Paths.get(TEMP_DIR, baseOutputFileNameWithoutExtension).toString();
 
-        boolean success = VideoProcessorUtils.convertVideo(inputFilePath, outputFilePath, outputFormat);
+        log.info("Processando conversão: {} → {} (Formato: {})", inputFilePath, outputFilePathWithoutExtension, outputFormat);
+
+        boolean success = VideoProcessorUtils.convertVideo(inputFilePath, outputFilePathWithoutExtension, outputFormat);
         if (!success) {
             handleConversionFailure(outputFormat);
         }
 
-        postConversionSuccess(timer, outputFilePath);
+        String finalOutputFilePath = outputFilePathWithoutExtension + "." + outputFormat.toLowerCase();
+        postConversionSuccess(timer, finalOutputFilePath);
 
         VideoConversion videoConversion = createAndSaveVideoConversion(videoFile, outputFormat);
         videoStatusManagerService.updateEntityStatus(videoConversionRepository, videoConversion.getId(),
                 VideoStatusEnum.COMPLETED, "Conversão concluída com sucesso.");
 
         log.info("Conversão do vídeo {} para o formato {} concluída. Arquivo de saída: {}",
-                videoId, outputFormat, outputFilePath);
+                videoId, outputFormat, finalOutputFilePath);
 
-        return outputFilePath;
+        return finalOutputFilePath;
     }
+
 
     private void handleConversionFailure(String outputFormat) {
         log.error("Falha ao converter o vídeo para o formato {}", outputFormat);

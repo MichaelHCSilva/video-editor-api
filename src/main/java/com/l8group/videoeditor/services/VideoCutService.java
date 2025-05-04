@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 import java.util.Set;
-import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -57,7 +56,8 @@ public class VideoCutService {
                 request.getVideoId(), request.getStartTime(), request.getEndTime(), previousFilePath);
 
         videoCutServiceMetrics.incrementCutRequests();
-        VideoFile videoFile = videoFileFinderService.findById(UUID.fromString(request.getVideoId()));
+        // Alteração feita: agora usamos diretamente o videoId na busca
+        VideoFile videoFile = videoFileFinderService.findById(request.getVideoId());
         String inputFilePath = VideoFileStorageUtils.buildFilePath(uploadDir, videoFile.getVideoFileName());
         if (!new File(inputFilePath).exists()) throw new VideoProcessingException("Arquivo de vídeo não encontrado.");
 
@@ -106,7 +106,8 @@ public class VideoCutService {
         videoCutServiceMetrics.decrementProcessingQueueSize();
 
         if (!success) {
-            videoCutServiceMetrics.incrementCutFailure();
+            videoCutServiceMetrics.incrementCutFailures();
+
             throw new VideoProcessingException("Falha ao processar o corte do vídeo.");
         }
 

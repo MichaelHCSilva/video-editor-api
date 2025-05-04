@@ -7,7 +7,6 @@ import java.nio.file.Paths;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -70,8 +69,7 @@ public class VideoBatchService {
             // Validação antecipada de todas as operações
             videoOperationExecutor.validateAllOperations(request.getVideoIds().get(0), request.getOperations());
 
-            List<UUID> videoUuids = request.getVideoIds().stream().map(UUID::fromString).collect(Collectors.toList());
-            originalVideoFile = videoFileFinderService.findById(videoUuids.get(0));
+            originalVideoFile = videoFileFinderService.findById(request.getVideoIds().get(0));
             currentInputFilePath = VideoFileStorageUtils.buildFilePath(UPLOAD_DIR,
                     originalVideoFile.getVideoFileName());
             outputFormat = originalVideoFile.getVideoFileFormat().replace(".", "");
@@ -122,11 +120,18 @@ public class VideoBatchService {
                 }
             }
 
-            // Mover o arquivo final gerado para o diretório de saída
+            // Gerar nome final para o arquivo
             String finalOutputFileName = VideoFileNameGenerator
                     .generateFileNameWithSuffix(originalVideoFile.getVideoFileName(), "PROCESSED");
-            Path finalOutputPath = Paths.get(TEMP_DIR, finalOutputFileName);
 
+            // Ajusta a extensão caso o formato tenha sido alterado
+            int dotIndex = finalOutputFileName.lastIndexOf(".");
+            if (dotIndex != -1) {
+                finalOutputFileName = finalOutputFileName.substring(0, dotIndex) + "." + outputFormat;
+            }
+
+            // Mover o arquivo final gerado para o diretório temporário
+            Path finalOutputPath = Paths.get(TEMP_DIR, finalOutputFileName);
             try {
                 VideoFileStorageUtils.moveFile(Paths.get(currentInputFilePath), finalOutputPath);
             } catch (IOException e) {
@@ -155,7 +160,7 @@ public class VideoBatchService {
             videoBatchServiceMetrics.decrementProcessingQueueSize();
             videoBatchServiceMetrics.setProcessedFileSize(finalOutputPath.toFile().length());
 
-            log.info("✅ [processBatch] Processamento concluído | Batch ID: {} | Arquivo final: {}",
+            log.info("[processBatch] Processamento concluído | Batch ID: {} | Arquivo final: {}",
                     batchProcess.getId(), finalOutputPath);
 
             return new VideoBatchResponseDTO(batchProcess.getId(), finalOutputFileName, batchProcess.getCreatedTimes(),

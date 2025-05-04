@@ -1,6 +1,7 @@
 package com.l8group.videoeditor.services;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.exceptions.InvalidResizeParameterException;
 import com.l8group.videoeditor.exceptions.VideoProcessingException;
 import com.l8group.videoeditor.metrics.VideoResizeServiceMetrics;
 import com.l8group.videoeditor.models.VideoFile;
@@ -8,22 +9,24 @@ import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.rabbit.producer.VideoResizeProducer;
 import com.l8group.videoeditor.repositories.VideoResizeRepository;
 import com.l8group.videoeditor.requests.VideoResizeRequest;
-import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
+import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
-//import com.l8group.videoeditor.utils.VideoResolutionsUtils;
 import com.l8group.videoeditor.validation.VideoResizeValidator;
-
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.ZonedDateTime;
-import java.util.UUID;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -34,80 +37,106 @@ public class VideoResizeService {
     private final VideoResizeProducer videoResizeProducer;
     private final VideoResizeServiceMetrics videoResizeServiceMetrics;
     private final VideoFileFinderService videoFileFinderService;
+    private final Validator validator; // ⬅️ Injetando o Bean Validator
 
     @Value("${video.temp.dir}")
-    private String TEMP_DIR;
+    private String tempDir;
 
     @Transactional
     public String resizeVideo(VideoResizeRequest request, String previousFilePath) {
+        log.info("[resizeVideo] Iniciando redimensionamento | VideoId: {} | Dimensões: {}x{}", request.getVideoId(), request.getWidth(), request.getHeight());
+
         videoResizeServiceMetrics.incrementResizeRequests();
 
-        // Chamando o novo validador correto
+        // Validação via Bean Validation (anotações no DTO)
+        log.debug("[resizeVideo] Validando request via Bean Validation...");
+        Set<ConstraintViolation<VideoResizeRequest>> violations = validator.validate(request);
+        if (!violations.isEmpty()) {
+            String errorMessages = violations.stream()
+                    .map(ConstraintViolation::getMessage)
+                    .collect(Collectors.joining(" | "));
+            log.error("❌ [resizeVideo] Erros de validação: {}", errorMessages);
+            throw new InvalidResizeParameterException("Parâmetros inválidos: " + errorMessages);
+        }
+
+        // Validação semântica (resoluções suportadas)
+        log.debug("[resizeVideo] Validando dimensões permitidas...");
         VideoResizeValidator.validate(request.getWidth(), request.getHeight());
 
-        UUID videoId = UUID.fromString(request.getVideoId());
-
-        VideoFile videoFile = videoFileFinderService.findById(videoId);
+        log.debug("[resizeVideo] Buscando vídeo no banco de dados...");
+        VideoFile videoFile = videoFileFinderService.findById(request.getVideoId());
 
         String inputFilePath = previousFilePath != null ? previousFilePath : videoFile.getVideoFilePath();
+        log.debug("[resizeVideo] Caminho do vídeo de entrada: {}", inputFilePath);
 
-        validateInputFile(inputFilePath);
+        validateInputFileExists(inputFilePath);
 
+        log.debug("[resizeVideo] Preparando caminho para o arquivo de saída...");
         String outputFilePath = prepareOutputFile(videoFile.getVideoFileName());
 
+        log.info("[resizeVideo] Processando redimensionamento...");
+        processResize(inputFilePath, outputFilePath, request);
+
+        log.debug("[resizeVideo] Salvando informações no banco...");
+        saveResizeEntity(videoFile, request);
+
+        log.info("[resizeVideo] Enviando mensagem para fila RabbitMQ...");
+        videoResizeProducer.sendMessage(videoFile.getId().toString());
+
+        log.info("✅ [resizeVideo] Redimensionamento finalizado com sucesso | Output: {}", outputFilePath);
+        return outputFilePath;
+    }
+
+    private void validateInputFileExists(String filePath) {
+        log.debug("[validateInputFileExists] Verificando existência do arquivo de entrada...");
+        File file = new File(filePath);
+        if (!file.exists()) {
+            log.error("❌ [validateInputFileExists] Arquivo de entrada não encontrado: {}", filePath);
+            throw new VideoProcessingException("Vídeo inexistente ou removido para o ID especificado.");
+        }
+        log.debug("[validateInputFileExists] Arquivo de entrada encontrado.");
+    }
+
+    private String prepareOutputFile(String originalFileName) {
+        log.debug("[prepareOutputFile] Criando diretório temporário se necessário...");
+        VideoFileStorageUtils.createDirectoryIfNotExists(tempDir);
+
+        String outputPath = VideoFileStorageUtils.buildFilePath(
+            tempDir, VideoFileNameGenerator.generateFileNameWithSuffix(originalFileName, "resize")
+        );
+
+        log.debug("[prepareOutputFile] Caminho do arquivo de saída preparado: {}", outputPath);
+        return outputPath;
+    }
+
+    private void processResize(String inputFilePath, String outputFilePath, VideoResizeRequest request) {
         try {
+            log.debug("[processResize] Chamando utilitário de redimensionamento...");
             boolean success = VideoProcessorUtils.resizeVideo(
-                    inputFilePath, outputFilePath, request.getWidth(), request.getHeight());
+                inputFilePath, outputFilePath, request.getWidth(), request.getHeight()
+            );
 
             if (!success) {
+                log.error("❌ [processResize] Redimensionamento falhou.");
                 throw new VideoProcessingException("Erro ao redimensionar vídeo.");
             }
 
             try {
                 long fileSize = Files.size(Paths.get(outputFilePath));
                 videoResizeServiceMetrics.setResizeFileSize(fileSize);
-                log.info("Tamanho do vídeo redimensionado: {} bytes", fileSize);
+                log.info("[processResize] Tamanho do vídeo redimensionado: {} bytes", fileSize);
             } catch (Exception e) {
-                log.error("Erro ao obter o tamanho do arquivo de saída: {}", e.getMessage());
+                log.warn("⚠️ [processResize] Erro ao obter o tamanho do arquivo de saída: {}", e.getMessage());
             }
 
         } catch (Exception e) {
+            log.error("❌ [processResize] Falha inesperada no redimensionamento do vídeo.", e);
             throw new VideoProcessingException("Erro inesperado ao redimensionar vídeo.", e);
         }
-
-        saveResizeEntity(videoFile, request);
-
-        videoResizeProducer.sendMessage(videoId.toString());
-
-        return outputFilePath;
-    }
-
-    /*private void validateRequestResolution(VideoResizeRequest request) {
-        if (!VideoResolutionsUtils.isValidResolution(request.getWidth(), request.getHeight())) {
-            String supported = VideoResolutionsUtils.getSupportedResolutionsAsString();
-            log.error("Resolução inválida: {}x{}. Resoluções suportadas: {}", request.getWidth(), request.getHeight(),
-                    supported);
-            throw new VideoProcessingException(
-                    String.format("Resolução não suportada: %dx%d. Suportadas: %s",
-                            request.getWidth(), request.getHeight(), supported));
-        }
-    }*/
-
-    private void validateInputFile(String filePath) {
-        File file = new File(filePath);
-        if (!file.exists()) {
-            log.error("Arquivo de entrada não encontrado: {}", filePath);
-            throw new VideoProcessingException("Vídeo inexistente ou removido para o ID especificado.");
-        }
-    }
-
-    private String prepareOutputFile(String originalFileName) {
-        VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
-        return VideoFileStorageUtils.buildFilePath(
-                TEMP_DIR, VideoFileNameGenerator.generateFileNameWithSuffix(originalFileName, "resize"));
     }
 
     private void saveResizeEntity(VideoFile videoFile, VideoResizeRequest request) {
+        log.debug("[saveResizeEntity] Persistindo entidade de redimensionamento...");
         VideoResize resize = new VideoResize();
         resize.setVideoFile(videoFile);
         resize.setTargetResolution(request.getWidth() + "x" + request.getHeight());
@@ -115,9 +144,11 @@ public class VideoResizeService {
         resize.setCreatedTimes(ZonedDateTime.now());
         resize.setUpdatedTimes(ZonedDateTime.now());
         videoResizeRepository.save(resize);
+        log.debug("[saveResizeEntity] Entidade salva com sucesso.");
     }
 
     public void deleteTemporaryFiles(String filePath) {
+        log.info("[deleteTemporaryFiles] Excluindo arquivo temporário: {}", filePath);
         VideoFileStorageUtils.deleteFileIfExists(new File(filePath));
     }
 }

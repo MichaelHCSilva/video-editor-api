@@ -19,21 +19,22 @@ public abstract class AbstractRetryConsumer {
         int retryCount = 0;
         while (retryCount < retryConfig.getMaxRetries()) {
             try {
-                task.run(); 
+                task.run();
                 return;
             } catch (Exception e) {
                 retryCount++;
                 if (retryCount < retryConfig.getMaxRetries()) {
-                    logger.warn("Erro na tentativa {}. Tentando novamente em {} ms.", retryCount, retryConfig.getRetryDelayMs(), e);
+                    logger.warn("Erro temporário na tentativa {}. Retentando em {} ms...", retryCount, retryConfig.getRetryDelayMs(), e);
                     try {
                         TimeUnit.MILLISECONDS.sleep(retryConfig.getRetryDelayMs());
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        logger.error("Thread interrompida durante espera de retry. Detalhes:", ie);
+                        logger.error("Thread interrompida durante espera de retry.", ie);
                         return;
                     }
                 } else {
-                    logger.error("Erro após {} tentativas. Abandonando retry. Detalhes:", retryCount, e);
+                    logger.error("Erro após {} tentativas. Enviando para a DLQ automaticamente via RabbitMQ.", retryCount, e);
+                    throw e; // Isso deixa o Spring lidar com a DLQ
                 }
             }
         }

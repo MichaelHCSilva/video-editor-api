@@ -39,9 +39,11 @@ public class VideoProcessorUtils {
     /**
      * Converte um vídeo para um formato específico.
      */
-    public static boolean convertVideo(String inputFilePath, String outputFilePath, String format) {
-        logger.info("Iniciando conversão do vídeo. inputFilePath={}, outputFilePath={}, formato={}",
-                inputFilePath, outputFilePath, format);
+    public static boolean convertVideo(String inputFilePath, String outputFilePathWithoutExtension, String format) {
+        logger.info("Iniciando conversão do vídeo. inputFilePath={}, outputFilePathWithoutExtension={}, formato={}",
+                inputFilePath, outputFilePathWithoutExtension, format);
+
+        String outputFilePathWithExtension = outputFilePathWithoutExtension + "." + format.toLowerCase();
 
         boolean success = executeFFmpegCommand(
                 "ffmpeg", "-i", inputFilePath,
@@ -49,12 +51,12 @@ public class VideoProcessorUtils {
                 "-c:a", "aac", "-b:a", "192k",
                 "-movflags", "+faststart",
                 "-map_metadata", "0", // Adicionado para preservar metadados
-                outputFilePath);
+                outputFilePathWithExtension);
 
         if (success) {
-            logger.info("Conversão concluída com sucesso: {}", outputFilePath);
+            logger.info("Conversão concluída com sucesso: {}", outputFilePathWithExtension);
         } else {
-            logger.error("Falha na conversão do vídeo: {}", outputFilePath);
+            logger.error("Falha na conversão do vídeo: {}", outputFilePathWithExtension);
         }
         return success;
     }

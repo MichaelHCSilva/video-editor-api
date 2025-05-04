@@ -1,63 +1,98 @@
 package com.l8group.videoeditor.metrics;
 
-import io.micrometer.core.instrument.*;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.Timer;
+import jakarta.annotation.PostConstruct;
+import io.micrometer.core.instrument.MeterRegistry;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+@Slf4j
 @Component
+@RequiredArgsConstructor
 public class VideoCutServiceMetrics {
 
-    private final Counter cutRequestsTotal;
-    private final Counter cutSuccessTotal;
-    private final Counter cutFailureTotal;
-    private final Timer cutDurationSeconds;
-    private final AtomicLong processingQueueSize = new AtomicLong(0);
-    private final AtomicLong cutFileSize = new AtomicLong(0);
+    private final MeterRegistry meterRegistry;
 
-    public VideoCutServiceMetrics(MeterRegistry registry) {
-        cutRequestsTotal = Counter.builder("video_cut_requests_total")
-                .description("Total de solicitações de corte de vídeo")
-                .register(registry);
+    private Counter cutRequests;
+    private Counter cutSuccess;
+    private Counter cutFailures;
+    private Counter cutFailureInvalidCutTime;
+    private Counter cutFailureInvalidMediaProperties;
+    private Counter cutFailureProcessing;
+    private Timer cutTimer;
+    private AtomicInteger processingQueueSize;
 
-        cutSuccessTotal = Counter.builder("video_cut_success_total")
-                .description("Total de cortes de vídeo bem-sucedidos")
-                .register(registry);
+    private AtomicLong maxCutDuration = new AtomicLong(0);
 
-        cutFailureTotal = Counter.builder("video_cut_failure_total")
-                .description("Total de cortes de vídeo com falha")
-                .register(registry);
+    @PostConstruct
+    private void initMetrics() {
+        cutRequests = meterRegistry.counter("video_cut_requests");
+        cutSuccess = meterRegistry.counter("video_cut_success");
+        cutFailures = meterRegistry.counter("video_cut_failures");
+        cutFailureInvalidCutTime = meterRegistry.counter("video_cut_failure_invalid_cut_time");
+        cutFailureInvalidMediaProperties = meterRegistry.counter("video_cut_failure_invalid_media_properties");
+        cutFailureProcessing = meterRegistry.counter("video_cut_failure_processing");
 
-        cutDurationSeconds = Timer.builder("video_cut_duration_seconds")
-                .description("Duração dos cortes de vídeo em segundos")
-                .register(registry);
+        cutTimer = meterRegistry.timer("video_cut_duration");
 
-        Gauge.builder("video_cut_queue_size", processingQueueSize, AtomicLong::get)
-                .description("Tamanho atual da fila de cortes de vídeo")
-                .register(registry);
+        processingQueueSize = new AtomicInteger(0);
+        Gauge.builder("video_cut_processing_queue_size", processingQueueSize, AtomicInteger::get)
+                .register(meterRegistry);
 
-        Gauge.builder("video_cut_file_size_bytes", cutFileSize, AtomicLong::get)
-                .description("Tamanho do vídeo cortado em bytes")
-                .register(registry);
+        if (meterRegistry.find("video_cut_duration_seconds_max") == null) {
+            Gauge.builder("video_cut_duration_seconds_max", maxCutDuration, AtomicLong::get)
+                    .register(meterRegistry);
+        }
+
+        log.info("VideoCutServiceMetrics initialized successfully");
     }
 
     public void incrementCutRequests() {
-        cutRequestsTotal.increment();
+        cutRequests.increment();
     }
 
     public void incrementCutSuccess() {
-        cutSuccessTotal.increment();
+        cutSuccess.increment();
     }
 
-    public void incrementCutFailure() {
-        cutFailureTotal.increment();
+    public void incrementCutFailures() {
+        cutFailures.increment();
+    }
+
+    public void incrementCutFailureInvalidCutTime() {
+        cutFailureInvalidCutTime.increment();
+    }
+
+    public void incrementCutFailureInvalidMediaProperties() {
+        cutFailureInvalidMediaProperties.increment();
+    }
+
+    public void incrementCutFailureProcessing() {
+        cutFailureProcessing.increment();
     }
 
     public Timer.Sample startCutTimer() {
         return Timer.start();
     }
 
-    public void recordCutDuration(Timer.Sample sample) {
-        sample.stop(cutDurationSeconds);
+    public void recordCutDuration(Timer.Sample timerSample) {
+        long duration = timerSample.stop(cutTimer);
+        updateMaxCutDuration(duration);
+    }
+
+    private void updateMaxCutDuration(long duration) {
+        long currentMax = maxCutDuration.get();
+        if (duration > currentMax) {
+            if (maxCutDuration.compareAndSet(currentMax, duration)) {
+                log.info("Updated max cut duration to: {} ms", duration);
+            }
+        }
     }
 
     public void incrementProcessingQueueSize() {
@@ -66,9 +101,5 @@ public class VideoCutServiceMetrics {
 
     public void decrementProcessingQueueSize() {
         processingQueueSize.decrementAndGet();
-    }
-
-    public void setCutFileSize(Long size) {
-        cutFileSize.set(size);
     }
 }

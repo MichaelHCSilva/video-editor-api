@@ -21,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.time.ZonedDateTime;
-import java.util.UUID;
+
 
 @Slf4j
 @Service
@@ -31,55 +31,61 @@ public class VideoOverlayService {
     private final VideoOverlayRepository videoOverlayRepository;
     private final VideoOverlayProducer videoOverlayProducer;
     private final VideoOverlayServiceMetrics videoOverlayServiceMetrics;
-    private final VideoFileFinderService videoFileFinderService; // Usando o serviço de busca
+    private final VideoFileFinderService videoFileFinderService;
     private final VideoOverlayValidator videoOverlayValidator;
+    
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
 
     @Transactional
     public String processOverlay(VideoOverlayRequest request, String previousFilePath) {
+        log.info("Iniciando processo de overlay para vídeo ID: {}", request.getVideoId());
         videoOverlayServiceMetrics.incrementOverlayRequests();
 
         // Valida a requisição
+        log.debug("Validando requisição de overlay: {}", request);
         videoOverlayValidator.validate(request);
 
-        // Obtém o ID do vídeo
-        UUID videoId = UUID.fromString(request.getVideoId());
-
-        // Verifica se o vídeo existe no banco; caso contrário, lança uma exceção
+        String videoId = request.getVideoId();
+        log.debug("Buscando vídeo no banco com ID: {}", videoId);
         VideoFile videoFile = videoFileFinderService.findById(videoId);
 
-        // Determina o caminho do arquivo de entrada
         String inputFilePath = previousFilePath != null ? previousFilePath : videoFile.getVideoFilePath();
+        log.debug("Caminho do arquivo de entrada determinado: {}", inputFilePath);
 
-        // Valida se o arquivo de entrada existe
         validateInputFile(inputFilePath);
 
-        // Prepara o caminho do arquivo de saída
         String outputFilePath = prepareOutputFile(videoFile.getVideoFileName());
+        log.info("Arquivo de saída será gerado em: {}", outputFilePath);
 
         try {
-            // Aplica o overlay no vídeo utilizando o FFmpeg
+            log.info("Aplicando overlay com texto '{}', posição '{}' e tamanho de fonte {}",
+                    request.getWatermark(), request.getPosition(), request.getFontSize());
+
             boolean success = VideoOverlayUtils.applyTextOverlayWithFFmpeg(
                     inputFilePath, outputFilePath,
                     request.getWatermark(), request.getPosition(), request.getFontSize(), null
             );
 
             if (!success) {
+                log.error("Falha na aplicação do overlay via FFmpeg.");
                 throw new VideoProcessingException("Erro ao aplicar overlay.");
             }
+
+            log.info("Overlay aplicado com sucesso para o vídeo: {}", videoId);
+
         } catch (Exception e) {
+            log.error("Erro inesperado durante o processamento de overlay para vídeo ID {}: {}", videoId, e.getMessage(), e);
             throw new VideoProcessingException("Erro inesperado ao aplicar overlay.", e);
         }
 
-        // Salva a entidade de overlay no banco de dados
         saveOverlayEntity(videoFile, request);
 
-        // Envia a mensagem para o RabbitMQ
-        videoOverlayProducer.sendVideoOverlayMessage(videoId.toString());
+        log.info("Enviando mensagem para o RabbitMQ com ID do vídeo: {}", videoId);
+        videoOverlayProducer.sendVideoOverlayMessage(videoId);
 
-        // Retorna o caminho do arquivo de saída
+        log.info("Processo de overlay finalizado com sucesso. Caminho de saída: {}", outputFilePath);
         return outputFilePath;
     }
 
@@ -89,16 +95,22 @@ public class VideoOverlayService {
             log.error("Arquivo de entrada não encontrado: {}", filePath);
             throw new VideoProcessingException("Vídeo inexistente ou removido para o ID especificado.");
         }
+        log.debug("Arquivo de entrada validado com sucesso: {}", filePath);
     }
 
     private String prepareOutputFile(String originalFileName) {
+        log.debug("Criando diretório temporário, se necessário: {}", TEMP_DIR);
         VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
-        return VideoFileStorageUtils.buildFilePath(
+
+        String generatedFilePath = VideoFileStorageUtils.buildFilePath(
                 TEMP_DIR, VideoFileNameGenerator.generateFileNameWithSuffix(originalFileName, "overlay")
         );
+        log.debug("Caminho do arquivo de saída preparado: {}", generatedFilePath);
+        return generatedFilePath;
     }
 
     private void saveOverlayEntity(VideoFile videoFile, VideoOverlayRequest request) {
+        log.debug("Salvando entidade de overlay no banco para vídeo ID: {}", videoFile.getId());
         VideoOverlay overlay = new VideoOverlay();
         overlay.setVideoFile(videoFile);
         overlay.setOverlayText(request.getWatermark());
@@ -108,10 +120,12 @@ public class VideoOverlayService {
         overlay.setCreatedTimes(ZonedDateTime.now());
         overlay.setUpdatedTimes(ZonedDateTime.now());
         videoOverlayRepository.save(overlay);
+        log.info("Entidade de overlay salva com status PROCESSING para vídeo ID: {}", videoFile.getId());
     }
 
     public void deleteTemporaryFiles(String filePath) {
+        log.debug("Tentando deletar arquivo temporário: {}", filePath);
         VideoFileStorageUtils.deleteFileIfExists(new File(filePath));
+        log.info("Arquivo temporário deletado (se existia): {}", filePath);
     }
 }
-
