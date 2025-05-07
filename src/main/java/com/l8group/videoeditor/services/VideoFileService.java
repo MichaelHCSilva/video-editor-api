@@ -41,12 +41,14 @@ public class VideoFileService {
     private final VideoProcessingProducer videoProcessingProducer;
     private final VideoFileServiceMetrics videoFileServiceMetrics;
     private final VideoFileFinderService videoFileFinderService;
+    private final VideoStatusManagerService videoStatusManagerService; // Injete o VideoStatusManagerService
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public VideoFileResponseDTO uploadVideo(MultipartFile file) throws IOException {
         log.info("[uploadVideo] Iniciando upload de vídeo: {}", file.getOriginalFilename());
         videoFileServiceMetrics.incrementUploadRequests();
         Timer.Sample sample = videoFileServiceMetrics.startUploadTimer();
+        VideoFile uploadedVideoFile = null; // Para rastrear a entidade salva
 
         File tempFile = null;
 
@@ -77,24 +79,33 @@ public class VideoFileService {
             log.info("[uploadVideo] Arquivo movido para diretório final: {}", finalFilePath);
 
             VideoFile videoFile = createVideoEntity(file, finalFilePath, newFileName);
-            videoFile = videoFileRepository.save(videoFile);
-            log.info("[uploadVideo] Entidade VideoFile salva com ID: {}", videoFile.getId());
+            uploadedVideoFile = videoFileRepository.save(videoFile);
+            log.info("[uploadVideo] Entidade VideoFile salva com ID: {}", uploadedVideoFile.getId());
 
-            videoProcessingProducer.sendVideoId(videoFile.getId());
-            log.info("[uploadVideo] Enviado para RabbitMQ: VideoID {}", videoFile.getId());
+            // Atualiza o status para COMPLETED após o upload bem-sucedido
+            videoStatusManagerService.updateEntityStatus(
+                    videoFileRepository, uploadedVideoFile.getId(), VideoStatusEnum.COMPLETED, "VideoFileService - Upload Concluído");
+
+            videoProcessingProducer.sendVideoId(uploadedVideoFile.getId());
+            log.info("[uploadVideo] Enviado para RabbitMQ: VideoID {}", uploadedVideoFile.getId());
 
             videoFileServiceMetrics.incrementUploadSuccess();
             videoFileServiceMetrics.recordUploadDuration(sample);
 
-            log.info("[uploadVideo] Upload concluído com sucesso para o vídeo: {}", videoFile.getVideoFileName());
+            log.info("[uploadVideo] Upload concluído com sucesso para o vídeo: {}", uploadedVideoFile.getVideoFileName());
             return new VideoFileResponseDTO(
-                    videoFile.getId(),
-                    videoFile.getVideoFileName(),
-                    videoFile.getCreatedTimes());
+                    uploadedVideoFile.getId(),
+                    uploadedVideoFile.getVideoFileName(),
+                    uploadedVideoFile.getCreatedTimes());
 
         } catch (Exception e) {
             videoFileServiceMetrics.incrementFileValidationErrors();
             log.error("❌ [uploadVideo] Erro durante upload de vídeo: {}", e.getMessage(), e);
+            // Atualiza o status para ERROR em caso de falha no upload
+            if (uploadedVideoFile != null) {
+                videoStatusManagerService.updateEntityStatus(
+                        videoFileRepository, uploadedVideoFile.getId(), VideoStatusEnum.ERROR, "VideoFileService - Falha no Upload");
+            }
             throw e;
         } finally {
             VideoFileStorageUtils.deleteFileIfExists(tempFile);
@@ -142,7 +153,7 @@ public class VideoFileService {
         videoFile.setVideoFilePath(filePath);
         videoFile.setCreatedTimes(ZonedDateTime.now());
         videoFile.setUpdatedTimes(ZonedDateTime.now());
-        videoFile.setStatus(VideoStatusEnum.PROCESSING);
+        videoFile.setStatus(VideoStatusEnum.PROCESSING); // Status inicial ao criar a entidade
 
         return videoFile;
     }

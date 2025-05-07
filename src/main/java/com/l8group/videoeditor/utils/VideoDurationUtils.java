@@ -10,15 +10,13 @@ public class VideoDurationUtils {
 
     private static final String DEFAULT_DURATION = "00:00:00";
 
-    // Método já existente para obter a duração do vídeo no formato HH:mm:ss
     public static String getVideoDurationAsString(String filePath) throws IOException {
         String duration = runFFmpegDurationCommand(filePath);
         return normalizeDurationFormat(duration);
     }
 
-    // Novo método para obter a duração do vídeo em segundos, utilizando o VideoFile
     public static int getVideoDurationInSeconds(VideoFile videoFile) throws IOException {
-        // Supondo que o VideoFile tem um método getFilePath() que retorna o caminho do arquivo
+
         String durationString = getVideoDurationAsString(videoFile.getVideoFilePath());
         return convertTimeToSeconds(durationString);
     }
@@ -69,7 +67,7 @@ public class VideoDurationUtils {
         boolean isNegative = false;
         if (time.startsWith("-")) {
             isNegative = true;
-            time = time.substring(1); // Remove o sinal negativo para o parsing
+            time = time.substring(1);
         }
 
         String[] parts = time.split(":");
@@ -82,20 +80,21 @@ public class VideoDurationUtils {
                 case 3:
                     hours = Integer.parseInt(parts[0]);
                     minutes = Integer.parseInt(parts[1]);
-                    seconds = (int) Math.floor(Double.parseDouble(parts[2])); // Trunca a fração
+                    seconds = (int) Math.floor(Double.parseDouble(parts[2]));
                     break;
                 case 2:
                     minutes = Integer.parseInt(parts[0]);
-                    seconds = (int) Math.floor(Double.parseDouble(parts[1])); // Trunca a fração
+                    seconds = (int) Math.floor(Double.parseDouble(parts[1]));
                     break;
                 case 1:
-                    seconds = (int) Math.floor(Double.parseDouble(parts[0])); // Trunca a fração
+                    seconds = (int) Math.floor(Double.parseDouble(parts[0]));
                     break;
                 default:
                     throw new IllegalArgumentException("Formato de tempo inválido: " + time);
             }
         } catch (NumberFormatException e) {
-            throw new IllegalArgumentException("Formato de tempo inválido: " + time + ". Certifique-se de usar números inteiros.");
+            throw new IllegalArgumentException(
+                    "Formato de tempo inválido: " + time + ". Certifique-se de usar números inteiros.");
         }
 
         int totalSeconds = (hours * 3600) + (minutes * 60) + seconds;
@@ -109,5 +108,17 @@ public class VideoDurationUtils {
         int seconds = absSeconds % 60;
         String sign = totalSeconds < 0 ? "-" : "";
         return String.format("%s%02d:%02d:%02d", sign, hours, minutes, seconds);
+    }
+
+    public static String calculateDurationBetween(String startTime, String endTime) {
+        int start = convertTimeToSeconds(startTime);
+        int end = convertTimeToSeconds(endTime);
+        int duration = end - start;
+
+        if (duration < 0) {
+            throw new IllegalArgumentException("End time deve ser maior que start time.");
+        }
+
+        return formatSecondsToTime(duration);
     }
 }

@@ -23,7 +23,6 @@ import com.l8group.videoeditor.repositories.VideoBatchProcessRepository;
 import com.l8group.videoeditor.requests.VideoBatchRequest;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoFileStorageUtils;
-//import com.l8group.videoeditor.validation.VideoBatchValidation;
 
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
@@ -82,7 +81,7 @@ public class VideoBatchService {
             batchProcess.setVideoFilePath(null);
             batchProcess.setProcessingSteps(request.getOperations().stream()
                     .map(VideoBatchRequest.BatchOperation::getOperationType).collect(Collectors.toList()));
-            videoBatchProcessRepository.save(batchProcess);
+            batchProcess = videoBatchProcessRepository.save(batchProcess); // Salva a entidade inicial
 
             // Processa as operações em sequência
             for (VideoBatchRequest.BatchOperation operation : request.getOperations()) {
@@ -150,9 +149,9 @@ public class VideoBatchService {
             batchProcess.setVideoFilePath(s3Service.getFileUrl(VideoS3Service.PROCESSED_VIDEO_FOLDER, finalOutputFileName));
             videoBatchProcessRepository.save(batchProcess);
 
-            // Atualizar o status do batch
+            // Atualizar o status do batch para COMPLETED
             videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
-                    VideoStatusEnum.COMPLETED, "processBatch");
+                    VideoStatusEnum.COMPLETED, "processBatch - Conclusão");
 
             // Métricas de processamento
             videoBatchServiceMetrics.recordBatchProcessingDuration(timerSample);
@@ -169,6 +168,11 @@ public class VideoBatchService {
         } catch (Exception e) {
             videoBatchServiceMetrics.incrementBatchFailure();
             videoBatchServiceMetrics.decrementProcessingQueueSize();
+            // Atualizar o status do batch para ERROR em caso de falha
+            if (batchProcess != null) {
+                videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
+                        VideoStatusEnum.ERROR, "processBatch - Falha");
+            }
             throw e;
         } finally {
             videoBatchServiceMetrics.decrementProcessingQueueSize();

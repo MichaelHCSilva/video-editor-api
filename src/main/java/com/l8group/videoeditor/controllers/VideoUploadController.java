@@ -5,10 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +21,6 @@ import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.dtos.VideoFileListDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.requests.VideoBatchRequest;
-import com.l8group.videoeditor.responses.ErrorResponse;
 import com.l8group.videoeditor.services.VideoBatchService;
 import com.l8group.videoeditor.services.VideoDownloadService;
 import com.l8group.videoeditor.services.VideoFileService;
@@ -97,24 +93,15 @@ public class VideoUploadController {
 
     @PostMapping("/batch-process")
     public ResponseEntity<?> processBatch(@Valid @RequestBody VideoBatchRequest request) throws IOException {
-        log.info("Recebida solicitação de processamento em lote: {}", request); 
+        log.info("Recebida solicitação de processamento em lote: {}", request);
         VideoBatchResponseDTO response = videoBatchService.processBatch(request);
         return ResponseEntity.ok(response);
     }
 
     @GetMapping("/download/{batchProcessId}")
-    public ResponseEntity<?> downloadVideo(@PathVariable UUID batchProcessId) {
-        try {
-            Resource resource = videoDownloadService.getProcessedVideo(batchProcessId);
-            return ResponseEntity.ok()
-                    .header(HttpHeaders.CONTENT_DISPOSITION,
-                            "attachment; filename=\"" + resource.getFilename() + "\"")
-                    .body(resource);
-        } catch (Exception e) {
-            log.error("Erro ao fazer download do vídeo com ID {}", batchProcessId, e);
-            return ResponseEntity.status(404)
-                    .body(ErrorResponse.of(List.of("Vídeo não encontrado: " + e.getMessage())));
-        }
+    public ResponseEntity<?> downloadVideo(@PathVariable String batchProcessId) {
+        log.info("Requisição de download para o vídeo com ID: {}", batchProcessId);
+        return videoDownloadService.downloadVideoStreamFromS3(batchProcessId);
     }
 
     @GetMapping

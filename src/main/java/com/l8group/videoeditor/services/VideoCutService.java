@@ -59,7 +59,8 @@ public class VideoCutService {
         // Alteração feita: agora usamos diretamente o videoId na busca
         VideoFile videoFile = videoFileFinderService.findById(request.getVideoId());
         String inputFilePath = VideoFileStorageUtils.buildFilePath(uploadDir, videoFile.getVideoFileName());
-        if (!new File(inputFilePath).exists()) throw new VideoProcessingException("Arquivo de vídeo não encontrado.");
+        if (!new File(inputFilePath).exists())
+            throw new VideoProcessingException("Arquivo de vídeo não encontrado.");
 
         // Validar o VideoCutRequest usando as anotações
         Set<ConstraintViolation<VideoCutRequest>> violations = validator.validate(request);
@@ -85,7 +86,7 @@ public class VideoCutService {
         try {
             VideoCutValidator.validateCutTimes(startTime, endTime, videoFile);
         } catch (InvalidCutTimeException e) {
-            throw e; 
+            throw e;
         }
 
         try {
@@ -101,29 +102,59 @@ public class VideoCutService {
 
         videoCutServiceMetrics.incrementProcessingQueueSize();
         Timer.Sample timer = videoCutServiceMetrics.startCutTimer();
-        boolean success = VideoProcessorUtils.cutVideo(inputFilePath, outputFilePath, request.getStartTime(), request.getEndTime());
-        videoCutServiceMetrics.recordCutDuration(timer);
-        videoCutServiceMetrics.decrementProcessingQueueSize();
 
-        if (!success) {
+        // Salva a entidade VideoCut com status PROCESSING antes de iniciar o
+        // processamento
+        VideoCut videoCutEntity = saveCutEntity(videoFile, request);
+        boolean success = false;
+        try {
+            success = VideoProcessorUtils.cutVideo(inputFilePath, outputFilePath, request.getStartTime(),
+                    request.getEndTime());
+            videoCutServiceMetrics.recordCutDuration(timer);
+            videoCutServiceMetrics.decrementProcessingQueueSize();
+
+            if (!success) {
+                videoCutServiceMetrics.incrementCutFailures();
+                videoStatusManagerService.updateEntityStatus(
+                        videoCutRepository, videoCutEntity.getId(), VideoStatusEnum.ERROR,
+                        "CutService - Falha no Processamento");
+                throw new VideoProcessingException("Falha ao processar o corte do vídeo.");
+            }
+
+            // Atualiza o status para COMPLETED em caso de sucesso
+            videoStatusManagerService.updateEntityStatus(
+                    videoCutRepository, videoCutEntity.getId(), VideoStatusEnum.COMPLETED, "CutService - Conclusão");
+
+        } catch (VideoProcessingException e) {
+            // Já atualizamos o status para ERROR dentro do bloco if (!success)
+            throw e;
+        } catch (Exception e) {
+            videoCutServiceMetrics.recordCutDuration(timer);
+            videoCutServiceMetrics.decrementProcessingQueueSize();
             videoCutServiceMetrics.incrementCutFailures();
-
-            throw new VideoProcessingException("Falha ao processar o corte do vídeo.");
+            videoStatusManagerService.updateEntityStatus(
+                    videoCutRepository, videoCutEntity.getId(), VideoStatusEnum.ERROR, "CutService - Erro Inesperado");
+            throw new VideoProcessingException("Erro inesperado ao cortar o vídeo.", e);
         }
 
-        int cutDurationSeconds = endTime - startTime;
+        videoCutProducer.sendVideoCutId(videoCutEntity.getId());
+
+        return outputFilePath;
+    }
+
+    private VideoCut saveCutEntity(VideoFile videoFile, VideoCutRequest request) {
+        log.debug("Persistindo entidade de corte de vídeo para o vídeo com ID: {}", videoFile.getId());
+        String cutDurationFormatted = VideoDurationUtils.calculateDurationBetween(
+                request.getStartTime(), request.getEndTime());
+
+        log.debug("Persistindo entidade de corte de vídeo...");
         VideoCut videoCut = new VideoCut();
         videoCut.setVideoFile(videoFile);
-        videoCut.setVideoCutDuration(VideoDurationUtils.formatSecondsToTime(cutDurationSeconds));
+        videoCut.setVideoCutDuration(cutDurationFormatted); 
         videoCut.setCreatedTimes(ZonedDateTime.now());
         videoCut.setUpdatedTimes(ZonedDateTime.now());
         videoCut.setStatus(VideoStatusEnum.PROCESSING);
-        videoCut = videoCutRepository.save(videoCut);
-
-        videoCutProducer.sendVideoCutId(videoCut.getId());
-        videoStatusManagerService.updateEntityStatus(videoCutRepository, videoCut.getId(), VideoStatusEnum.COMPLETED, "CutService - Conclusão");
-
-        return outputFilePath;
+        return videoCutRepository.save(videoCut);
     }
 
     public void deleteTemporaryFiles(String filePath) {

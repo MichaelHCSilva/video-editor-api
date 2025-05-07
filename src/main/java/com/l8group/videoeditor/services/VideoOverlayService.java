@@ -33,7 +33,7 @@ public class VideoOverlayService {
     private final VideoOverlayServiceMetrics videoOverlayServiceMetrics;
     private final VideoFileFinderService videoFileFinderService;
     private final VideoOverlayValidator videoOverlayValidator;
-    
+    private final VideoStatusManagerService videoStatusManagerService; // Injete o VideoStatusManagerService
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;
@@ -59,6 +59,8 @@ public class VideoOverlayService {
         String outputFilePath = prepareOutputFile(videoFile.getVideoFileName());
         log.info("Arquivo de saída será gerado em: {}", outputFilePath);
 
+        VideoOverlay overlayEntity = saveOverlayEntity(videoFile, request); // Salva a entidade inicialmente com status PROCESSING
+
         try {
             log.info("Aplicando overlay com texto '{}', posição '{}' e tamanho de fonte {}",
                     request.getWatermark(), request.getPosition(), request.getFontSize());
@@ -70,22 +72,29 @@ public class VideoOverlayService {
 
             if (!success) {
                 log.error("Falha na aplicação do overlay via FFmpeg.");
+                videoStatusManagerService.updateEntityStatus(
+                        videoOverlayRepository, overlayEntity.getId(), VideoStatusEnum.ERROR, "VideoOverlayService - FFmpeg Failure");
                 throw new VideoProcessingException("Erro ao aplicar overlay.");
             }
 
             log.info("Overlay aplicado com sucesso para o vídeo: {}", videoId);
+            videoStatusManagerService.updateEntityStatus(
+                    videoOverlayRepository, overlayEntity.getId(), VideoStatusEnum.COMPLETED, "VideoOverlayService - Conclusão");
 
+        } catch (VideoProcessingException e) {
+            // Já atualizamos o status para ERROR dentro do bloco if (!success)
+            throw e;
         } catch (Exception e) {
             log.error("Erro inesperado durante o processamento de overlay para vídeo ID {}: {}", videoId, e.getMessage(), e);
+            videoStatusManagerService.updateEntityStatus(
+                    videoOverlayRepository, overlayEntity.getId(), VideoStatusEnum.ERROR, "VideoOverlayService - Unexpected Error");
             throw new VideoProcessingException("Erro inesperado ao aplicar overlay.", e);
         }
-
-        saveOverlayEntity(videoFile, request);
 
         log.info("Enviando mensagem para o RabbitMQ com ID do vídeo: {}", videoId);
         videoOverlayProducer.sendVideoOverlayMessage(videoId);
 
-        log.info("Processo de overlay finalizado com sucesso. Caminho de saída: {}", outputFilePath);
+        log.info("Processo de overlay finalizado. Caminho de saída: {}", outputFilePath);
         return outputFilePath;
     }
 
@@ -109,7 +118,7 @@ public class VideoOverlayService {
         return generatedFilePath;
     }
 
-    private void saveOverlayEntity(VideoFile videoFile, VideoOverlayRequest request) {
+    private VideoOverlay saveOverlayEntity(VideoFile videoFile, VideoOverlayRequest request) {
         log.debug("Salvando entidade de overlay no banco para vídeo ID: {}", videoFile.getId());
         VideoOverlay overlay = new VideoOverlay();
         overlay.setVideoFile(videoFile);
@@ -119,8 +128,7 @@ public class VideoOverlayService {
         overlay.setStatus(VideoStatusEnum.PROCESSING);
         overlay.setCreatedTimes(ZonedDateTime.now());
         overlay.setUpdatedTimes(ZonedDateTime.now());
-        videoOverlayRepository.save(overlay);
-        log.info("Entidade de overlay salva com status PROCESSING para vídeo ID: {}", videoFile.getId());
+        return videoOverlayRepository.save(overlay);
     }
 
     public void deleteTemporaryFiles(String filePath) {

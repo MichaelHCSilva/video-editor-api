@@ -12,11 +12,9 @@ public class VideoOverlayPositionUtils {
     public static final String CENTER = "center";
 
     private static final List<String> VALID_POSITIONS = Arrays.asList(
-        TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CENTER
-    );
+            TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT, CENTER);
 
     private VideoOverlayPositionUtils() {
-        // Classe utilitária, não deve ser instanciada
     }
 
     public static boolean isValidPosition(String position) {
