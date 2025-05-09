@@ -194,7 +194,7 @@ public class VideoS3Service {
         if (ext.endsWith(".mp4"))
             contentType = "video/mp4";
         if (ext.endsWith(".avi"))
-            contentType = "video/x-msvideo";
+            contentType = "video/avi";
         if (ext.endsWith(".mov"))
             contentType = "video/quicktime";
         logger.debug("Content type para {}: {}", fileName, contentType);

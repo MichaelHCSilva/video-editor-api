@@ -56,13 +56,11 @@ public class VideoCutService {
                 request.getVideoId(), request.getStartTime(), request.getEndTime(), previousFilePath);
 
         videoCutServiceMetrics.incrementCutRequests();
-        // Alteração feita: agora usamos diretamente o videoId na busca
         VideoFile videoFile = videoFileFinderService.findById(request.getVideoId());
         String inputFilePath = VideoFileStorageUtils.buildFilePath(uploadDir, videoFile.getVideoFileName());
         if (!new File(inputFilePath).exists())
             throw new VideoProcessingException("Arquivo de vídeo não encontrado.");
 
-        // Validar o VideoCutRequest usando as anotações
         Set<ConstraintViolation<VideoCutRequest>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
             StringBuilder errorMessage = new StringBuilder("Erros na requisição de corte: ");
@@ -103,8 +101,6 @@ public class VideoCutService {
         videoCutServiceMetrics.incrementProcessingQueueSize();
         Timer.Sample timer = videoCutServiceMetrics.startCutTimer();
 
-        // Salva a entidade VideoCut com status PROCESSING antes de iniciar o
-        // processamento
         VideoCut videoCutEntity = saveCutEntity(videoFile, request);
         boolean success = false;
         try {
@@ -121,12 +117,10 @@ public class VideoCutService {
                 throw new VideoProcessingException("Falha ao processar o corte do vídeo.");
             }
 
-            // Atualiza o status para COMPLETED em caso de sucesso
             videoStatusManagerService.updateEntityStatus(
                     videoCutRepository, videoCutEntity.getId(), VideoStatusEnum.COMPLETED, "CutService - Conclusão");
 
         } catch (VideoProcessingException e) {
-            // Já atualizamos o status para ERROR dentro do bloco if (!success)
             throw e;
         } catch (Exception e) {
             videoCutServiceMetrics.recordCutDuration(timer);

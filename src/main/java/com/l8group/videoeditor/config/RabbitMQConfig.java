@@ -16,6 +16,10 @@ public class RabbitMQConfig {
 
     public static final String VIDEO_EXCHANGE = "video.exchange";
 
+    public static final String USER_STATUS_QUEUE = "user.status.queue";
+    public static final String USER_STATUS_ROUTING_KEY = "user.status";
+    public static final String USER_STATUS_DLQ = "user.status.dlq";
+
     public static final String VIDEO_PROCESSING_QUEUE = "video.processing.queue";
     public static final String VIDEO_PROCESSING_ROUTING_KEY = "video.process";
     public static final String VIDEO_PROCESSING_DLQ = "video.processing.dlq";
@@ -39,6 +43,12 @@ public class RabbitMQConfig {
     public static final String VIDEO_BATCH_PROCESSING_QUEUE = "video.batch.processing.queue";
     public static final String VIDEO_BATCH_PROCESSING_ROUTING_KEY = "video.batch.process";
     public static final String VIDEO_BATCH_PROCESSING_DLQ = "video.batch.processing.dlq";
+
+    @Bean
+    public Queue userStatusQueue() {
+        return new Queue(USER_STATUS_QUEUE, true, false, false,
+                Map.of("x-dead-letter-exchange", "", "x-dead-letter-routing-key", USER_STATUS_DLQ));
+    }
 
     @Bean
     public Queue videoProcessingQueue() {
@@ -78,6 +88,11 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue userStatusDLQ() {
+        return new Queue(USER_STATUS_DLQ, true);
+    }
+
+    @Bean
     public Queue videoProcessingDLQ() {
         return new Queue(VIDEO_PROCESSING_DLQ, true);
     }
@@ -110,6 +125,11 @@ public class RabbitMQConfig {
     @Bean
     public TopicExchange videoExchange() {
         return new TopicExchange(VIDEO_EXCHANGE);
+    }
+
+    @Bean
+    public Binding userStatusBinding(Queue userStatusQueue, TopicExchange videoExchange) {
+        return BindingBuilder.bind(userStatusQueue).to(videoExchange).with(USER_STATUS_ROUTING_KEY);
     }
 
     @Bean
