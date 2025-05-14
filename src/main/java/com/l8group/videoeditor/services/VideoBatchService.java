@@ -65,7 +65,6 @@ public class VideoBatchService {
 
         try {
             VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
-            // Validação antecipada de todas as operações
             videoOperationExecutor.validateAllOperations(request.getVideoIds().get(0), request.getOperations());
 
             originalVideoFile = videoFileFinderService.findById(request.getVideoIds().get(0));
@@ -81,37 +80,31 @@ public class VideoBatchService {
             batchProcess.setVideoFilePath(null);
             batchProcess.setProcessingSteps(request.getOperations().stream()
                     .map(VideoBatchRequest.BatchOperation::getOperationType).collect(Collectors.toList()));
-            batchProcess = videoBatchProcessRepository.save(batchProcess); // Salva a entidade inicial
+            batchProcess = videoBatchProcessRepository.save(batchProcess); 
 
-            // Processa as operações em sequência
             for (VideoBatchRequest.BatchOperation operation : request.getOperations()) {
                 log.info("🔹 [processBatch] Processando operação: {} | Input: {}", operation.getOperationType(),
                         currentInputFilePath);
 
-                // Executa a operação usando o VideoOperationExecutor
                 String nextOutputFilePath = videoOperationExecutor.execute(
                         request.getVideoIds().get(0),
-                        List.of(operation), // Passando a operação individualmente
+                        List.of(operation), 
                         currentInputFilePath,
                         outputFormat);
 
-                // Verifica se a operação gerou um arquivo de saída
                 if (nextOutputFilePath != null) {
                     if (!new File(nextOutputFilePath).exists()) {
-                        log.error("❌ [processBatch] Arquivo de saída não encontrado após operação: {}",
+                        log.error("[processBatch] Arquivo de saída não encontrado após operação: {}",
                                 nextOutputFilePath);
                         throw new RuntimeException("Arquivo de saída não encontrado após operação.");
                     }
 
-                    // Se for um arquivo intermediário, salva a referência
                     if (currentInputFilePath.startsWith(TEMP_DIR)) {
                         intermediateFiles.add(currentInputFilePath);
                     }
 
-                    // Atualiza o caminho do arquivo de entrada para o próximo arquivo gerado
                     currentInputFilePath = nextOutputFilePath;
 
-                    // Atualiza o formato de saída
                     int lastDot = nextOutputFilePath.lastIndexOf(".");
                     if (lastDot > 0) {
                         outputFormat = nextOutputFilePath.substring(lastDot + 1);
@@ -119,17 +112,14 @@ public class VideoBatchService {
                 }
             }
 
-            // Gerar nome final para o arquivo
             String finalOutputFileName = VideoFileNameGenerator
                     .generateFileNameWithSuffix(originalVideoFile.getVideoFileName(), "PROCESSED");
 
-            // Ajusta a extensão caso o formato tenha sido alterado
             int dotIndex = finalOutputFileName.lastIndexOf(".");
             if (dotIndex != -1) {
                 finalOutputFileName = finalOutputFileName.substring(0, dotIndex) + "." + outputFormat;
             }
 
-            // Mover o arquivo final gerado para o diretório temporário
             Path finalOutputPath = Paths.get(TEMP_DIR, finalOutputFileName);
             try {
                 VideoFileStorageUtils.moveFile(Paths.get(currentInputFilePath), finalOutputPath);
@@ -138,22 +128,17 @@ public class VideoBatchService {
                 throw new RuntimeException("Erro ao mover o arquivo final para o diretório temporário", e);
             }
 
-            // Limpeza dos arquivos intermediários
             intermediateFiles.forEach(filePath -> VideoFileStorageUtils.deleteFileIfExists(new File(filePath)));
 
-            // Enviar o batch process para o RabbitMQ
             videoBatchProducer.sendVideoBatchId(batchProcess.getId());
 
-            // Realiza o upload final para o S3
             s3Service.uploadProcessedFile(finalOutputPath.toFile(), finalOutputFileName, originalVideoFile.getId());
             batchProcess.setVideoFilePath(s3Service.getFileUrl(VideoS3Service.PROCESSED_VIDEO_FOLDER, finalOutputFileName));
             videoBatchProcessRepository.save(batchProcess);
 
-            // Atualizar o status do batch para COMPLETED
             videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
                     VideoStatusEnum.COMPLETED, "processBatch - Conclusão");
 
-            // Métricas de processamento
             videoBatchServiceMetrics.recordBatchProcessingDuration(timerSample);
             videoBatchServiceMetrics.incrementBatchSuccess();
             videoBatchServiceMetrics.decrementProcessingQueueSize();
@@ -168,7 +153,6 @@ public class VideoBatchService {
         } catch (Exception e) {
             videoBatchServiceMetrics.incrementBatchFailure();
             videoBatchServiceMetrics.decrementProcessingQueueSize();
-            // Atualizar o status do batch para ERROR em caso de falha
             if (batchProcess != null) {
                 videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
                         VideoStatusEnum.ERROR, "processBatch - Falha");

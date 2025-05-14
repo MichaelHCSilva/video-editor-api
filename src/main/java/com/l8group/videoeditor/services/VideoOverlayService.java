@@ -59,7 +59,7 @@ public class VideoOverlayService {
         String outputFilePath = prepareOutputFile(videoFile.getVideoFileName());
         log.info("Arquivo de saída será gerado em: {}", outputFilePath);
 
-        VideoOverlay overlayEntity = saveOverlayEntity(videoFile, request); // Salva a entidade inicialmente com status PROCESSING
+        VideoOverlay overlayEntity = saveOverlayEntity(videoFile, request); 
 
         try {
             log.info("Aplicando overlay com texto '{}', posição '{}' e tamanho de fonte {}",
@@ -82,7 +82,6 @@ public class VideoOverlayService {
                     videoOverlayRepository, overlayEntity.getId(), VideoStatusEnum.COMPLETED, "VideoOverlayService - Conclusão");
 
         } catch (VideoProcessingException e) {
-            // Já atualizamos o status para ERROR dentro do bloco if (!success)
             throw e;
         } catch (Exception e) {
             log.error("Erro inesperado durante o processamento de overlay para vídeo ID {}: {}", videoId, e.getMessage(), e);

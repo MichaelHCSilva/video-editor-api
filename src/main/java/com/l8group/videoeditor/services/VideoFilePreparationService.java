@@ -14,25 +14,19 @@ import com.l8group.videoeditor.models.VideoFile;
 public class VideoFilePreparationService {
 
     @Value("${video.upload.dir}")
-    private String uploadDir; // Diretório configurado onde os vídeos estão armazenados localmente
+    private String uploadDir; 
 
     private static final Logger logger = LoggerFactory.getLogger(VideoFilePreparationService.class);
 
     /**
-     * Retorna o caminho do arquivo de entrada local.
-     * Não baixa do S3, apenas confia no caminho local configurado.
-     * 
-     * @param videoFile O objeto que contém os detalhes do arquivo de vídeo.
-     * @return O caminho local do arquivo de vídeo.
+     * @param videoFile 
+     * @return 
      */
     public String prepareVideoFileAndInputPath(VideoFile videoFile) {
-        // Aqui o nome do arquivo é obtido diretamente do banco de dados
-        String fileName = videoFile.getVideoFileName(); // CAMPO CORRETO MAPEADO NO BANCO
+        String fileName = videoFile.getVideoFileName(); 
 
-        // Concatena o diretório configurado com o nome do arquivo
         String inputFilePath = Paths.get(uploadDir, fileName).toString();
 
-        // Verifica se o arquivo realmente existe no caminho local
         File file = new File(inputFilePath);
         if (file.exists()) {
             logger.info("Arquivo encontrado localmente em: {}", inputFilePath);

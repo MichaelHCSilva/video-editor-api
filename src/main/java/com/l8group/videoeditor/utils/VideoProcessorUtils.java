@@ -12,9 +12,6 @@ public class VideoProcessorUtils {
 
     private static final Logger logger = LoggerFactory.getLogger(VideoProcessorUtils.class);
 
-    /**
-     * Corta um vídeo com base no tempo de início e fim.
-     */
     public static boolean cutVideo(String inputFilePath, String outputFilePath, String startTime, String endTime) {
         logger.info("Iniciando corte do vídeo. inputFilePath={}, outputFilePath={}, startTime={}, endTime={}",
                 inputFilePath, outputFilePath, startTime, endTime);
@@ -25,7 +22,7 @@ public class VideoProcessorUtils {
                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                 "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
-                "-map_metadata", "0", // Adicionado para preservar metadados
+                "-map_metadata", "0",
                 outputFilePath);
 
         if (success) {
@@ -36,9 +33,6 @@ public class VideoProcessorUtils {
         return success;
     }
 
-    /**
-     * Converte um vídeo para um formato específico.
-     */
     public static boolean convertVideo(String inputFilePath, String outputFilePathWithoutExtension, String format) {
         logger.info("Iniciando conversão do vídeo. inputFilePath={}, outputFilePathWithoutExtension={}, formato={}",
                 inputFilePath, outputFilePathWithoutExtension, format);
@@ -50,7 +44,7 @@ public class VideoProcessorUtils {
                 "-c:v", "libx264", "-preset", "slow", "-crf", "23",
                 "-c:a", "aac", "-b:a", "192k",
                 "-movflags", "+faststart",
-                "-map_metadata", "0", // Adicionado para preservar metadados
+                "-map_metadata", "0",
                 outputFilePathWithExtension);
 
         if (success) {
@@ -61,9 +55,6 @@ public class VideoProcessorUtils {
         return success;
     }
 
-    /**
-     * Redimensiona um vídeo para uma nova resolução.
-     */
     public static boolean resizeVideo(String inputFilePath, String outputFilePath, int width, int height) {
         logger.info("Iniciando redimensionamento do vídeo. inputFilePath={}, outputFilePath={}, width={}, height={}",
                 inputFilePath, outputFilePath, width, height);
@@ -74,7 +65,7 @@ public class VideoProcessorUtils {
                 "-c:v", "libx264", "-preset", "fast", "-crf", "23",
                 "-c:a", "aac", "-b:a", "128k",
                 "-movflags", "+faststart",
-                "-map_metadata", "0", // Adicionado para preservar metadados
+                "-map_metadata", "0",
                 outputFilePath);
 
         if (success) {
@@ -85,9 +76,6 @@ public class VideoProcessorUtils {
         return success;
     }
 
-    /**
-     * Executa um comando FFmpeg.
-     */
     private static boolean executeFFmpegCommand(String... command) {
         logger.info("Executando comando FFmpeg: {}", String.join(" ", command));
 
@@ -105,7 +93,8 @@ public class VideoProcessorUtils {
                 long duration = endTime - startTime;
 
                 if (exitCode != 0) {
-                    logger.error("Erro ao executar FFmpeg. Código de saída: {}. Saída do processo:\n{}", exitCode, ffmpegOutput);
+                    logger.error("Erro ao executar FFmpeg. Código de saída: {}. Saída do processo:\n{}", exitCode,
+                            ffmpegOutput);
                     return false;
                 } else {
                     logger.info("Comando FFmpeg executado com sucesso em {} ms. Saída:\n{}", duration, ffmpegOutput);

@@ -73,9 +73,7 @@ public class VideoConversionService {
         String outputFileNameWithSuffix = VideoFileNameGenerator.generateFileNameWithSuffix(videoFile.getVideoFileName(), "convert");
         String outputFilePathWithSuffix = VideoFileStorageUtils.buildFilePath(TEMP_DIR, outputFileNameWithSuffix);
 
-        // Obter o nome do arquivo base (com o sufixo _CONVERT, mas sem a extensão original)
         String baseOutputFileNameWithSuffix = Paths.get(outputFilePathWithSuffix).getFileName().toString();
-        // Remover a extensão original, se houver (ex: .mp4, .avi)
         int lastDotIndex = baseOutputFileNameWithSuffix.lastIndexOf('.');
         String baseOutputFileNameWithoutExtension = (lastDotIndex == -1) ? baseOutputFileNameWithSuffix : baseOutputFileNameWithSuffix.substring(0, lastDotIndex);
         String outputFilePathWithoutExtension = Paths.get(TEMP_DIR, baseOutputFileNameWithoutExtension).toString();

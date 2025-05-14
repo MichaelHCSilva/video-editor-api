@@ -84,7 +84,7 @@ public class VideoOperationExecutor {
                         Integer height = parseInteger(operation.getParameters().getHeight());
                         log.debug("[validateAllOperations] RESIZE params: width={}, height={}", width, height);
                         validateRequest(new VideoResizeRequest(videoId, width, height));
-                        VideoResizeValidator.validate(width, height); // Validação da resolução
+                        VideoResizeValidator.validate(width, height); 
                     }
                     case "OVERLAY" -> {
                         log.debug("[validateAllOperations] OVERLAY params: text={}, position={}, fontSize={}",
@@ -119,7 +119,7 @@ public class VideoOperationExecutor {
                 String error = "Operation error '" + operation.getOperationType() + "': " + e.getMessage();
                 errorMessages.add(error);
                 log.warn("[validateAllOperations] Argumento inválido: {}", error);
-            } catch (InvalidResizeParameterException e) { // Captura a exceção de resolução inválida
+            } catch (InvalidResizeParameterException e) { 
                 String error = "Operation error 'RESIZE': " + e.getMessage();
                 errorMessages.add(error);
                 log.warn("[validateAllOperations] Erro de resolução inválida: {}", error);
@@ -162,7 +162,7 @@ public class VideoOperationExecutor {
         Integer width = parseInteger(parameters.getWidth());
         Integer height = parseInteger(parameters.getHeight());
 
-        VideoResizeValidator.validate(width, height); // Validação da resolução durante a execução
+        VideoResizeValidator.validate(width, height); 
         VideoResizeRequest request = new VideoResizeRequest(videoId, width, height);
         validateRequest(request);
 

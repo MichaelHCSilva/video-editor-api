@@ -1,0 +1,88 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres-db
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: video_editor_db
+    volumes:
+      - video_editor_postgres_data:/var/lib/postgresql/data
+    networks:
+      - video-editor-network
+    ports:
+      - "5432:5432"
+    restart: always
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq-queue
+    hostname: rabbitmq-queue
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    volumes:
+      - video_editor_rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - video-editor-network
+    restart: always
+
+  video-editor-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: video-editor-api-service:latest
+    container_name: video-editor-api-container
+    depends_on:
+      - postgres
+      - rabbitmq
+    env_file:
+      - .env
+    environment:
+      SPRING_DATASOURCE_URL: ${DB_URL}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      SPRING_RABBITMQ_HOST: ${RABBITMQ_HOST}
+      SPRING_RABBITMQ_PORT: ${RABBITMQ_PORT}
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_S3_REGION: ${AWS_S3_REGION}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_EXPIRATION_TIME: ${JWT_EXPIRATION_TIME}
+      VIDEO_UPLOAD_DIR: ${VIDEO_UPLOAD_DIR}
+      VIDEO_TEMP_DIR: ${VIDEO_TEMP_DIR}
+      FFPROBE_PATH: ${FFPROBE_PATH}
+      FFMPEG_PATH: ${FFMPEG_PATH}
+    volumes:
+      - ./videos:/videos
+    ports:
+      - "8080:8080"
+    networks:
+      - video-editor-network
+    restart: always
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus-container
+    volumes:
+      - video_editor_prometheus_data:/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - video-editor-network
+    restart: always
+
+volumes:
+  video_editor_postgres_data:
+  video_editor_rabbitmq_data:
+  video_editor_prometheus_data:
+
+networks:
+  video-editor-network:

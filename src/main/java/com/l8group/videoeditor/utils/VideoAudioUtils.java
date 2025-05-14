@@ -9,7 +9,6 @@ public class VideoAudioUtils {
 
     private static final int PROCESS_TIMEOUT_SECONDS = 15;
 
-    // 1. Verifica se o vídeo possui trilha de áudio
     public static boolean hasAudioTrack(String filePath) throws IOException {
         String[] command = {
             "ffprobe", "-v", "error", "-select_streams", "a",
@@ -25,7 +24,6 @@ public class VideoAudioUtils {
         }
     }
 
-    // 2. Verifica se um segmento do vídeo está silencioso (sem áudio audível)
     public static boolean isSilentSegment(String filePath, int start, int end) throws IOException {
         if (start >= end) {
             throw new IllegalArgumentException("O tempo inicial deve ser menor que o final.");
@@ -44,16 +42,13 @@ public class VideoAudioUtils {
         }
     }
 
-    // 3. Verifica se o áudio e o vídeo começam sincronizados (tolerância simples)
     public static boolean isAudioVideoSynced(String filePath) throws IOException {
         double videoStart = getStreamStartTime(filePath, "v:0");
         double audioStart = getStreamStartTime(filePath, "a:0");
 
-        // Retorna true se a diferença for menor que 0.5 segundos
         return Math.abs(videoStart - audioStart) < 0.5;
     }
 
-    // Auxiliar: Obtém o tempo de início de uma stream de áudio ou vídeo
     private static double getStreamStartTime(String filePath, String streamSpecifier) throws IOException {
         String[] command = {
             "ffprobe", "-v", "error", "-select_streams", streamSpecifier,
@@ -67,11 +62,10 @@ public class VideoAudioUtils {
             String line = reader.readLine();
             return line != null ? Double.parseDouble(line.trim()) : 0.0;
         } catch (NumberFormatException e) {
-            return 0.0; // fallback seguro
+            return 0.0; 
         }
     }
 
-    // Aguarda o processo e aplica timeout
     private static void waitForProcess(Process process) throws IOException {
         try {
             if (!process.waitFor(PROCESS_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {

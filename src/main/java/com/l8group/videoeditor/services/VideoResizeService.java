@@ -38,7 +38,7 @@ public class VideoResizeService {
     private final VideoResizeServiceMetrics videoResizeServiceMetrics;
     private final VideoFileFinderService videoFileFinderService;
     private final Validator validator;
-    private final VideoStatusManagerService videoStatusManagerService; // Injete o VideoStatusManagerService
+    private final VideoStatusManagerService videoStatusManagerService; 
 
     @Value("${video.temp.dir}")
     private String tempDir;
@@ -49,18 +49,16 @@ public class VideoResizeService {
 
         videoResizeServiceMetrics.incrementResizeRequests();
 
-        // Validação via Bean Validation (anotações no DTO)
         log.debug("[resizeVideo] Validando request via Bean Validation...");
         Set<ConstraintViolation<VideoResizeRequest>> violations = validator.validate(request);
         if (!violations.isEmpty()) {
             String errorMessages = violations.stream()
                     .map(ConstraintViolation::getMessage)
                     .collect(Collectors.joining(" | "));
-            log.error("❌ [resizeVideo] Erros de validação: {}", errorMessages);
+            log.error("[resizeVideo] Erros de validação: {}", errorMessages);
             throw new InvalidResizeParameterException("Parâmetros inválidos: " + errorMessages);
         }
 
-        // Validação semântica (resoluções suportadas)
         log.debug("[resizeVideo] Validando dimensões permitidas...");
         VideoResizeValidator.validate(request.getWidth(), request.getHeight());
 
@@ -75,22 +73,18 @@ public class VideoResizeService {
         log.debug("[resizeVideo] Preparando caminho para o arquivo de saída...");
         String outputFilePath = prepareOutputFile(videoFile.getVideoFileName());
 
-        // Salva a entidade VideoResize com status PROCESSING antes de iniciar o processamento
         VideoResize resizeEntity = saveResizeEntity(videoFile, request);
 
         log.info("[resizeVideo] Processando redimensionamento...");
         try {
             processResize(inputFilePath, outputFilePath, request);
-            // Atualiza o status para COMPLETED em caso de sucesso
             videoStatusManagerService.updateEntityStatus(
                     videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.COMPLETED, "VideoResizeService - Conclusão");
         } catch (VideoProcessingException e) {
-            // Atualiza o status para ERROR em caso de falha no processamento
             videoStatusManagerService.updateEntityStatus(
                     videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.ERROR, "VideoResizeService - Processamento Falhou");
             throw e;
         } catch (Exception e) {
-            // Atualiza o status para ERROR em caso de erro inesperado
             videoStatusManagerService.updateEntityStatus(
                     videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.ERROR, "VideoResizeService - Erro Inesperado");
             throw new VideoProcessingException("Erro inesperado ao redimensionar vídeo.", e);
@@ -99,7 +93,7 @@ public class VideoResizeService {
         log.debug("[resizeVideo] Enviando mensagem para fila RabbitMQ...");
         videoResizeProducer.sendMessage(videoFile.getId().toString());
 
-        log.info("✅ [resizeVideo] Redimensionamento finalizado com sucesso | Output: {}", outputFilePath);
+        log.info("[resizeVideo] Redimensionamento finalizado com sucesso | Output: {}", outputFilePath);
         return outputFilePath;
     }
 
@@ -107,7 +101,7 @@ public class VideoResizeService {
         log.debug("[validateInputFileExists] Verificando existência do arquivo de entrada...");
         File file = new File(filePath);
         if (!file.exists()) {
-            log.error("❌ [validateInputFileExists] Arquivo de entrada não encontrado: {}", filePath);
+            log.error("[validateInputFileExists] Arquivo de entrada não encontrado: {}", filePath);
             throw new VideoProcessingException("Vídeo inexistente ou removido para o ID especificado.");
         }
         log.debug("[validateInputFileExists] Arquivo de entrada encontrado.");
@@ -133,7 +127,7 @@ public class VideoResizeService {
             );
 
             if (!success) {
-                log.error("❌ [processResize] Redimensionamento falhou.");
+                log.error("[processResize] Redimensionamento falhou.");
                 throw new VideoProcessingException("Erro ao redimensionar vídeo.");
             }
 
@@ -142,11 +136,11 @@ public class VideoResizeService {
                 videoResizeServiceMetrics.setResizeFileSize(fileSize);
                 log.info("[processResize] Tamanho do vídeo redimensionado: {} bytes", fileSize);
             } catch (Exception e) {
-                log.warn("⚠️ [processResize] Erro ao obter o tamanho do arquivo de saída: {}", e.getMessage());
+                log.warn("[processResize] Erro ao obter o tamanho do arquivo de saída: {}", e.getMessage());
             }
 
         } catch (Exception e) {
-            log.error("❌ [processResize] Falha inesperada no redimensionamento do vídeo.", e);
+            log.error("[processResize] Falha inesperada no redimensionamento do vídeo.", e);
             throw new VideoProcessingException("Erro inesperado ao redimensionar vídeo.", e);
         }
     }

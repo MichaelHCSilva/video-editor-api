@@ -66,7 +66,8 @@ public class VideoDownloadService {
             logger.info("Arquivo de vídeo do S3 retornado com sucesso para batchProcessId: {}", rawBatchProcessId);
 
             HttpHeaders headers = new HttpHeaders();
-            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + downloadFileName + "\"");
+            headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + downloadFileName + "\"");
+            headers.add(HttpHeaders.CONTENT_TYPE, detectMimeType(downloadFileName));
 
             return new ResponseEntity<>(resource, headers, HttpStatus.OK);
 
@@ -146,4 +147,15 @@ public class VideoDownloadService {
         logger.info("InputStreamResource criado e retornado para o caminho: {}", filePath);
         return resource;
     }
+
+    private String detectMimeType(String filename) {
+        if (filename.endsWith(".mp4"))
+            return "video/mp4";
+        if (filename.endsWith(".avi"))
+            return "video/avi";
+        if (filename.endsWith(".mov"))
+            return "video/quicktime";
+        return "application/octet-stream"; 
+    }
+
 }

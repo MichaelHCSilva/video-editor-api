@@ -41,14 +41,14 @@ public class VideoFileService {
     private final VideoProcessingProducer videoProcessingProducer;
     private final VideoFileServiceMetrics videoFileServiceMetrics;
     private final VideoFileFinderService videoFileFinderService;
-    private final VideoStatusManagerService videoStatusManagerService; // Injete o VideoStatusManagerService
+    private final VideoStatusManagerService videoStatusManagerService; 
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public VideoFileResponseDTO uploadVideo(MultipartFile file) throws IOException {
         log.info("[uploadVideo] Iniciando upload de vídeo: {}", file.getOriginalFilename());
         videoFileServiceMetrics.incrementUploadRequests();
         Timer.Sample sample = videoFileServiceMetrics.startUploadTimer();
-        VideoFile uploadedVideoFile = null; // Para rastrear a entidade salva
+        VideoFile uploadedVideoFile = null; 
 
         File tempFile = null;
 
@@ -82,7 +82,6 @@ public class VideoFileService {
             uploadedVideoFile = videoFileRepository.save(videoFile);
             log.info("[uploadVideo] Entidade VideoFile salva com ID: {}", uploadedVideoFile.getId());
 
-            // Atualiza o status para COMPLETED após o upload bem-sucedido
             videoStatusManagerService.updateEntityStatus(
                     videoFileRepository, uploadedVideoFile.getId(), VideoStatusEnum.COMPLETED, "VideoFileService - Upload Concluído");
 
@@ -100,8 +99,7 @@ public class VideoFileService {
 
         } catch (Exception e) {
             videoFileServiceMetrics.incrementFileValidationErrors();
-            log.error("❌ [uploadVideo] Erro durante upload de vídeo: {}", e.getMessage(), e);
-            // Atualiza o status para ERROR em caso de falha no upload
+            log.error("[uploadVideo] Erro durante upload de vídeo: {}", e.getMessage(), e);
             if (uploadedVideoFile != null) {
                 videoStatusManagerService.updateEntityStatus(
                         videoFileRepository, uploadedVideoFile.getId(), VideoStatusEnum.ERROR, "VideoFileService - Falha no Upload");
@@ -153,7 +151,7 @@ public class VideoFileService {
         videoFile.setVideoFilePath(filePath);
         videoFile.setCreatedTimes(ZonedDateTime.now());
         videoFile.setUpdatedTimes(ZonedDateTime.now());
-        videoFile.setStatus(VideoStatusEnum.PROCESSING); // Status inicial ao criar a entidade
+        videoFile.setStatus(VideoStatusEnum.PROCESSING);
 
         return videoFile;
     }

@@ -14,7 +14,7 @@ public class VideoResolutionsUtils {
     }
 
     public static boolean isValidResolution(int width, int height) {
-        return VALID_RESOLUTIONS.contains(width + "x" + height);
+        return VALID_RESOLUTIONS.contains(width + " x " + height);
     }
 
     public static String getSupportedResolutionsAsString() {

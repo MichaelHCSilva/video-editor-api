@@ -16,9 +16,6 @@ public class VideoFileStorageUtils {
 
     private static final Logger log = LoggerFactory.getLogger(VideoFileStorageUtils.class);
 
-    /**
-     * Resolve o caminho do arquivo, priorizando o anterior se fornecido.
-     */
     public static String resolveInputFilePath(String previousFilePath, String defaultPath) {
         String path = (previousFilePath != null && !previousFilePath.isEmpty())
                 ? previousFilePath
@@ -28,8 +25,6 @@ public class VideoFileStorageUtils {
     }
 
     /**
-     * Valida se o arquivo de entrada realmente existe.
-     * 
      * @param inputFilePath
      * @param onFailure
      */
@@ -53,25 +48,21 @@ public class VideoFileStorageUtils {
     }
 
     /**
-     * Verifica se o caminho é um URL remoto.
-     * 
-     * @param path Caminho a ser verificado.
-     * @return Retorna verdadeiro se for um URL, falso caso contrário.
+     * @param path
+     * @return
      */
     private static boolean isRemotePath(String path) {
         return path.startsWith("http://") || path.startsWith("https://");
     }
 
     /**
-     * Verifica se a URL está acessível.
-     * 
-     * @param urlString URL a ser verificada.
-     * @return Retorna verdadeiro se a URL for acessível, falso caso contrário.
+     * @param urlString
+     * @return
      */
     private static boolean urlExists(String urlString) {
         try {
             URI uri = URI.create(urlString);
-            URL url = uri.toURL(); // uso não-deprecated de URL
+            URL url = uri.toURL();
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("HEAD");
             connection.setConnectTimeout(5000);
@@ -85,9 +76,7 @@ public class VideoFileStorageUtils {
     }
 
     /**
-     * Cria um diretório se ele não existir.
-     * 
-     * @param dir Caminho do diretório a ser criado.
+     * @param dir
      */
     public static void createDirectoryIfNotExists(String dir) {
         File directory = new File(dir);
@@ -103,11 +92,9 @@ public class VideoFileStorageUtils {
     }
 
     /**
-     * Move um arquivo de um local para outro.
-     * 
-     * @param source Caminho do arquivo de origem.
-     * @param target Caminho do arquivo de destino.
-     * @throws IOException Se ocorrer um erro durante a movimentação.
+     * @param source
+     * @param target
+     * @throws IOException
      */
     public static void moveFile(Path source, Path target) throws IOException {
         Files.move(source, target, StandardCopyOption.REPLACE_EXISTING);
@@ -115,9 +102,7 @@ public class VideoFileStorageUtils {
     }
 
     /**
-     * Exclui um arquivo se ele existir.
-     * 
-     * @param file O arquivo a ser excluído.
+     * @param file
      */
     public static void deleteFileIfExists(File file) {
         if (file != null && file.exists()) {
@@ -131,12 +116,10 @@ public class VideoFileStorageUtils {
     }
 
     public static String buildFilePath(String directory, String fileName) {
-        // Verifica se o diretório não termina com "/" e adiciona se necessário
         if (!directory.endsWith(File.separator)) {
             directory += File.separator;
         }
 
-        // Retorna o caminho completo do arquivo
         return directory + fileName;
     }
 
