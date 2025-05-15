@@ -80,7 +80,7 @@ public class VideoBatchService {
             batchProcess.setVideoFilePath(null);
             batchProcess.setProcessingSteps(request.getOperations().stream()
                     .map(VideoBatchRequest.BatchOperation::getOperationType).collect(Collectors.toList()));
-            batchProcess = videoBatchProcessRepository.save(batchProcess); 
+            batchProcess = videoBatchProcessRepository.save(batchProcess);
 
             for (VideoBatchRequest.BatchOperation operation : request.getOperations()) {
                 log.info("🔹 [processBatch] Processando operação: {} | Input: {}", operation.getOperationType(),
@@ -88,7 +88,7 @@ public class VideoBatchService {
 
                 String nextOutputFilePath = videoOperationExecutor.execute(
                         request.getVideoIds().get(0),
-                        List.of(operation), 
+                        List.of(operation),
                         currentInputFilePath,
                         outputFormat);
 
@@ -132,8 +132,9 @@ public class VideoBatchService {
 
             videoBatchProducer.sendVideoBatchId(batchProcess.getId());
 
-            s3Service.uploadProcessedFile(finalOutputPath.toFile(), finalOutputFileName, originalVideoFile.getId());
-            batchProcess.setVideoFilePath(s3Service.getFileUrl(VideoS3Service.PROCESSED_VIDEO_FOLDER, finalOutputFileName));
+            String processedFileUrl = s3Service.uploadProcessedFile(finalOutputPath.toFile(), finalOutputFileName,
+                    originalVideoFile.getId());
+            batchProcess.setVideoFilePath(processedFileUrl);
             videoBatchProcessRepository.save(batchProcess);
 
             videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),

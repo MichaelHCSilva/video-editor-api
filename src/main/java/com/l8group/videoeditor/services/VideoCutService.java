@@ -95,8 +95,9 @@ public class VideoCutService {
         }
 
         VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
-        String outputFilePath = Paths.get(TEMP_DIR, VideoFileNameGenerator.generateFileNameWithSuffix(
-                videoFile.getVideoFileName(), "cut")).toString();
+        String uniqueFileName = VideoFileNameGenerator.generateUniqueFileName(videoFile.getVideoFileName());
+        String outputFilePath = Paths
+                .get(TEMP_DIR, VideoFileNameGenerator.generateFileNameWithSuffix(uniqueFileName, "cut")).toString();
 
         videoCutServiceMetrics.incrementProcessingQueueSize();
         Timer.Sample timer = videoCutServiceMetrics.startCutTimer();
@@ -144,7 +145,7 @@ public class VideoCutService {
         log.debug("Persistindo entidade de corte de vídeo...");
         VideoCut videoCut = new VideoCut();
         videoCut.setVideoFile(videoFile);
-        videoCut.setVideoCutDuration(cutDurationFormatted); 
+        videoCut.setVideoCutDuration(cutDurationFormatted);
         videoCut.setCreatedTimes(ZonedDateTime.now());
         videoCut.setUpdatedTimes(ZonedDateTime.now());
         videoCut.setStatus(VideoStatusEnum.PROCESSING);

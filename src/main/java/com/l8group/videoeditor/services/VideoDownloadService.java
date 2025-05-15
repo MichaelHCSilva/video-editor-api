@@ -115,7 +115,6 @@ public class VideoDownloadService {
 
             } catch (Exception e) {
                 logger.error("Erro ao processar o URL do S3: {}", e.getMessage());
-
             }
         }
 
@@ -157,5 +156,4 @@ public class VideoDownloadService {
             return "video/quicktime";
         return "application/octet-stream"; 
     }
-
 }
