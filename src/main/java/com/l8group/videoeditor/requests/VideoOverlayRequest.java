@@ -22,11 +22,11 @@ public class VideoOverlayRequest {
     @Size(min = 1, max = 50, message = "O texto da marca d'água deve ter entre 1 e 50 caracteres.")
     private String watermark;
 
-    @NotBlank(message = "A posição da sobreposição é obrigatória e não pode estar em branco.")
-    @Pattern(regexp = "top-left|top-right|bottom-left|bottom-right|center", message = "A posição da sobreposição deve ser uma das seguintes: top-left, top-right, bottom-left, bottom-right, center.")
+    @NotBlank(message = "A posição da marca d'água é obrigatória e não pode estar em branco.")
+    @Pattern(regexp = "top-left|top-right|bottom-left|bottom-right|center", message = "A posição da marca d'água deve ser uma das seguintes: top-left, top-right, bottom-left, bottom-right, center.")
     private String position;
 
-    @NotNull(message = "O tamanho da fonte é obrigatório e não pode ser nulo.")
+    @NotNull(message = "O tamanho da fonte é obrigatório e não pode estar em branco.")
     @Min(value = 1, message = "O tamanho da fonte deve ser maior que 0.")
     private Integer fontSize;
 }

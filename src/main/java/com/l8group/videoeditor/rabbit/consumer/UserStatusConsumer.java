@@ -40,7 +40,6 @@ public class UserStatusConsumer extends AbstractRetryConsumer {
                 UUID userId = UUID.fromString(userIdStr);
                 logger.info("Solicitação de atualização de status recebida para o usuário com ID '{}' às: {}", userId, LocalDateTime.now());
 
-                // **Importante:** Assumindo que o novo status virá de um header chamado 'newStatus'
                 String newStatusStr = message.getHeaders().get("newStatus", String.class);
                 if (newStatusStr == null) {
                     logger.error("Header 'newStatus' não encontrado na mensagem para o usuário com ID: {}", userId);

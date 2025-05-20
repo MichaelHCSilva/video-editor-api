@@ -7,19 +7,13 @@ import lombok.experimental.UtilityClass;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Validador de regras de negócio para redimensionamento de vídeos.
- * Aceita apenas resoluções definidas em VideoResolutionsUtils.
- * Foca em validações semânticas e proteção contra entradas maliciosas.
- */
+
 @UtilityClass
 public class VideoResizeValidator {
 
     /**
-     * Valida a largura e altura solicitadas para redimensionamento de vídeo.
-     *
-     * @param width  Largura solicitada
-     * @param height Altura solicitada
+     * @param width 
+     * @param height 
      */
     public static void validate(Integer width, Integer height) {
         List<String> errors = new ArrayList<>();

@@ -9,33 +9,30 @@ import java.util.regex.Pattern;
 @Component
 public class VideoConversionValidator {
 
-    // Valida o ID do vídeo (não permite caracteres especiais ou espaços em branco)
     public void validateVideoId(String videoId) {
         if (videoId == null || videoId.trim().isEmpty()) {
-            throw new InvalidRequestException("O ID do vídeo não pode ser vazio.");
+            throw new InvalidRequestException("O ID do vídeo é obrigatório e não pode estar vazio.");
         }
-        if (!Pattern.matches("^[a-fA-F0-9-]{36}$", videoId)) { // Valida se é um UUID válido
-            throw new InvalidRequestException("O ID do vídeo deve ser um UUID válido.");
+        if (!Pattern.matches("^[a-fA-F0-9-]{36}$", videoId)) { 
+            throw new InvalidRequestException("O ID do vídeo informado é inválido. Deve ser um UUID válido (ex: 123e4567-e89b-12d3-a456-426614174000).");
         }
     }
 
-    // Valida o formato de saída (deve ser mp4, avi ou mov)
     public void validateOutputFormat(String outputFormat) {
         if (outputFormat == null || outputFormat.trim().isEmpty()) {
-            throw new InvalidRequestException("O formato de saída não pode ser vazio.");
+            throw new InvalidRequestException("O formato de saída é obrigatório e não pode estar vazio.");
         }
         if (!Pattern.matches("^(mp4|avi|mov)$", outputFormat.toLowerCase())) {
-            throw new InvalidRequestException("Formatos suportados: mp4, avi, mov.");
+            throw new InvalidRequestException("Formato de saída inválido. Aceitamos apenas: mp4, avi, mov.");
         }
     }
 
-    // Valida se o nome do arquivo não contém caracteres especiais
     public void validateFileName(String fileName) {
         if (!StringUtils.hasText(fileName)) {
-            throw new InvalidRequestException("O nome do arquivo não pode ser vazio.");
+            throw new InvalidRequestException("O nome do arquivo é obrigatório e não pode estar vazio.");
         }
-        if (!Pattern.matches("^[a-zA-Z0-9._-]+$", fileName)) { // Permite apenas letras, números, _ , . e -
-            throw new InvalidRequestException("O nome do arquivo contém caracteres inválidos.");
+        if (!Pattern.matches("^[a-zA-Z0-9._-]+$", fileName)) { 
+            throw new InvalidRequestException("O nome do arquivo contém caracteres inválidos. Use apenas letras, números, '.', '-' ou '_'.");
         }
     }
 }

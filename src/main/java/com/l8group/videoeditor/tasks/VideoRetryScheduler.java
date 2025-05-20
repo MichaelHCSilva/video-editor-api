@@ -50,7 +50,7 @@ public class VideoRetryScheduler {
 
         for (VideoFile video : failedVideos) {
             try {
-                int currentRetryCount = video.getRetryCount(); // Obter o retryCount da entidade
+                int currentRetryCount = video.getRetryCount(); 
 
                 if (currentRetryCount >= maxRetries) {
                     videoStatusManagerService.updateEntityStatus(videoFileRepository, video.getId(), VideoStatusEnum.FAILED_PERMANENTLY, "RetryScheduler");
@@ -75,7 +75,7 @@ public class VideoRetryScheduler {
                 }
 
                 video.setVideoFilePath(s3Url);
-                video.setRetryCount(0); // Resetar o retryCount aqui
+                video.setRetryCount(0);
                 videoFileRepository.save(video);
 
                 videoStatusManagerService.updateEntityStatus(videoFileRepository, video.getId(), VideoStatusEnum.COMPLETED, "RetryScheduler");

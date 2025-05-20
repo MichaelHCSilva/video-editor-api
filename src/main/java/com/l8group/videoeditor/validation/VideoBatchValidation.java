@@ -9,11 +9,15 @@ public class VideoBatchValidation {
 
     public void validateRequest(VideoBatchRequest request) {
         if (request.getVideoIds() == null || request.getVideoIds().isEmpty()) {
-            throw new InvalidVideoIdListException("Campo obrigatório 'videoIds' ausente ou vazio.");
+            throw new InvalidVideoIdListException(
+                "O campo obrigatório 'videoIds' está vazio ou não foi informado. " +
+                "Por favor, informe ao menos um ID de vídeo para processar.");
         }
 
         if (request.getOperations() == null || request.getOperations().isEmpty()) {
-            throw new IllegalArgumentException("Campo obrigatório 'operations' ausente ou vazio.");
+            throw new IllegalArgumentException(
+                "O campo obrigatório 'operations' está vazio ou não foi informado. " +
+                "É necessário informar pelo menos uma operação a ser realizada.");
         }
 
         for (VideoBatchRequest.BatchOperation op : request.getOperations()) {
@@ -26,26 +30,27 @@ public class VideoBatchValidation {
         VideoBatchRequest.OperationParameters params = operation.getParameters();
 
         if (type == null || type.isBlank()) {
-            throw new IllegalArgumentException("Campo obrigatório 'operationType' ausente ou vazio.");
+            throw new IllegalArgumentException(
+                "O campo obrigatório 'operationType' está vazio ou não foi informado. " +
+                "Por favor, informe o tipo da operação.");
         }
 
         if (params == null) {
-            throw new IllegalArgumentException("Campo obrigatório 'parameters' não foi fornecido.");
+            throw new IllegalArgumentException(
+                "O campo obrigatório 'parameters' não foi informado. " +
+                "É necessário fornecer os parâmetros para a operação.");
         }
 
-        // A validação específica para cada tipo de operação foi removida daqui.
-        // Espera-se que cada operação tenha sua própria validação.
         switch (type.toUpperCase()) {
             case "RESIZE":
             case "OVERLAY":
             case "CONVERT":
             case "CUT":
-                // Nenhuma validação específica aqui. Assume-se que as classes de Request e Validator de cada operação farão isso.
                 break;
             default:
-                throw new IllegalArgumentException("Tipo de operação não suportado: '" + type + "'.");
+                throw new IllegalArgumentException(
+                    "O tipo de operação '" + type + "' não é suportado. " +
+                    "Tipos suportados: RESIZE, OVERLAY, CONVERT, CUT.");
         }
     }
-
-    
 }

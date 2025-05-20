@@ -33,12 +33,10 @@ public class VideoOverlayConsumer extends AbstractRetryConsumer {
                 logger.info("Overlay de vídeo {} processado com sucesso. Status atualizado às: {}", videoOverlayId, ZonedDateTime.now());
             } catch (IllegalArgumentException e) {
                 logger.error("Erro ao converter UUID: String '{}' não é um UUID válido. Detalhes: {}", videoOverlayIdStr, e.getMessage());
-                // Enviar explicitamente para a DLQ após falha crítica
                 rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_OVERLAY_DLQ, videoOverlayIdStr);
                 throw new RuntimeException("Erro no processamento do overlay de vídeo: " + e.getMessage(), e);
             } catch (Exception e) {
                 logger.error("Erro ao processar overlay de vídeo com ID '{}'. Detalhes: {}", videoOverlayIdStr, e.getMessage());
-                // Enviar explicitamente para a DLQ após falha crítica
                 rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_OVERLAY_DLQ, videoOverlayIdStr);
                 throw new RuntimeException("Erro no processamento do overlay de vídeo: " + e.getMessage(), e);
             }

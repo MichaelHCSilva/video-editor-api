@@ -1,4 +1,4 @@
-package com.l8group.videoeditor.responses;
+/*package com.l8group.videoeditor.responses;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,3 +12,4 @@ public class SuccessResponse {
         return new SuccessResponse(message);
     }
 }
+*/

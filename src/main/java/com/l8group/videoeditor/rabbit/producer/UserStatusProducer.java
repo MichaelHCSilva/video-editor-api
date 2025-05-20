@@ -29,7 +29,6 @@ public class UserStatusProducer {
                 .setHeader("newStatus", newStatus.toString())
                 .build();
 
-        // Envia para a Exchange com a routing key correta
         rabbitTemplate.send(RabbitMQConfig.VIDEO_EXCHANGE, RabbitMQConfig.USER_STATUS_ROUTING_KEY, message);
 
         logger.info("Mensagem de atualização de status enviada para a exchange '{}' com a routing key '{}' para o usuário '{}'",

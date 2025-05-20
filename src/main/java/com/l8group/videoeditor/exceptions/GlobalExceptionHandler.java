@@ -27,15 +27,12 @@ public class GlobalExceptionHandler {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler({
-            VideoNotFoundException.class,
             VideoProcessingNotFoundException.class,
             ProcessedFileNotFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         String errorMessage = "Recurso não encontrado.";
-        if (ex instanceof VideoNotFoundException) {
-            errorMessage = "O vídeo com o ID fornecido não foi encontrado.";
-        } else if (ex instanceof VideoProcessingNotFoundException) {
+        if (ex instanceof VideoProcessingNotFoundException) {
             errorMessage = ex.getMessage();
         } else if (ex instanceof ProcessedFileNotFoundException) {
             errorMessage = "O arquivo de vídeo processado não foi encontrado: " + ex.getMessage();
@@ -49,7 +46,6 @@ public class GlobalExceptionHandler {
             InvalidMediaPropertiesException.class,
             InvalidResizeParameterException.class,
             InvalidVideoIdListException.class,
-            VideoDurationParseException.class
     })
     public ResponseEntity<ErrorResponse> handleBadRequest(RuntimeException ex) {
         return buildResponse(HttpStatus.BAD_REQUEST, List.of(ex.getMessage()), ex);

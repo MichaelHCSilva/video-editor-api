@@ -11,5 +11,5 @@ import com.l8group.videoeditor.models.VideoProcessingBatch;
 @Repository
 public interface VideoBatchProcessRepository extends JpaRepository<VideoProcessingBatch, UUID> {
 
-    Optional<VideoProcessingBatch> findByVideoFileId(UUID videoFileId); // Ajuste aqui
+    Optional<VideoProcessingBatch> findByVideoFileId(UUID videoFileId);
 }

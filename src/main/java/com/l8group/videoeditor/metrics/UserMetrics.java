@@ -21,19 +21,19 @@ public class UserMetrics {
 
     @PostConstruct
     public void init() {
-        logger.info("Inicializando UserMetrics e registrando contadores."); // Adicione este log
+        logger.info("Inicializando UserMetrics e registrando contadores."); 
         usersRegisteredSuccessfully = meterRegistry.counter("user_registrations_success_total");
         registrationErrors = meterRegistry.counter("user_registration_errors_total");
     }
 
     public void incrementRegistrationSuccessCount() {
         usersRegisteredSuccessfully.increment();
-        logger.debug("Incrementando user_registrations_success_total"); // Adicione este log
+        logger.debug("Incrementando user_registrations_success_total"); 
     }
 
     public void incrementRegistrationErrorCount() {
         registrationErrors.increment();
-        logger.debug("Incrementando user_registration_errors_total"); // Adicione este log
+        logger.debug("Incrementando user_registration_errors_total"); 
     }
 
 }

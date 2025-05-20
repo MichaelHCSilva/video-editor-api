@@ -17,8 +17,10 @@ import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.NoVideosFoundException;
 import com.l8group.videoeditor.metrics.VideoFileServiceMetrics;
+import com.l8group.videoeditor.models.UserAccount;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoProcessingProducer;
+import com.l8group.videoeditor.repositories.UserRepository;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
@@ -41,14 +43,15 @@ public class VideoFileService {
     private final VideoProcessingProducer videoProcessingProducer;
     private final VideoFileServiceMetrics videoFileServiceMetrics;
     private final VideoFileFinderService videoFileFinderService;
-    private final VideoStatusManagerService videoStatusManagerService; 
+    private final VideoStatusManagerService videoStatusManagerService;
+    private final UserRepository userAccountRepository;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public VideoFileResponseDTO uploadVideo(MultipartFile file) throws IOException {
         log.info("[uploadVideo] Iniciando upload de vídeo: {}", file.getOriginalFilename());
         videoFileServiceMetrics.incrementUploadRequests();
         Timer.Sample sample = videoFileServiceMetrics.startUploadTimer();
-        VideoFile uploadedVideoFile = null; 
+        VideoFile uploadedVideoFile = null;
 
         File tempFile = null;
 
@@ -78,12 +81,14 @@ public class VideoFileService {
             VideoFileStorageUtils.moveFile(tempFile.toPath(), targetPath);
             log.info("[uploadVideo] Arquivo movido para diretório final: {}", finalFilePath);
 
-            VideoFile videoFile = createVideoEntity(file, finalFilePath, newFileName);
+            UserAccount userAccount = getCurrentUser();
+            VideoFile videoFile = createVideoEntity(file, finalFilePath, newFileName, userAccount);
             uploadedVideoFile = videoFileRepository.save(videoFile);
             log.info("[uploadVideo] Entidade VideoFile salva com ID: {}", uploadedVideoFile.getId());
 
             videoStatusManagerService.updateEntityStatus(
-                    videoFileRepository, uploadedVideoFile.getId(), VideoStatusEnum.COMPLETED, "VideoFileService - Upload Concluído");
+                    videoFileRepository, uploadedVideoFile.getId(), VideoStatusEnum.COMPLETED,
+                    "VideoFileService - Upload Concluído");
 
             videoProcessingProducer.sendVideoId(uploadedVideoFile.getId());
             log.info("[uploadVideo] Enviado para RabbitMQ: VideoID {}", uploadedVideoFile.getId());
@@ -91,7 +96,8 @@ public class VideoFileService {
             videoFileServiceMetrics.incrementUploadSuccess();
             videoFileServiceMetrics.recordUploadDuration(sample);
 
-            log.info("[uploadVideo] Upload concluído com sucesso para o vídeo: {}", uploadedVideoFile.getVideoFileName());
+            log.info("[uploadVideo] Upload concluído com sucesso para o vídeo: {}",
+                    uploadedVideoFile.getVideoFileName());
             return new VideoFileResponseDTO(
                     uploadedVideoFile.getId(),
                     uploadedVideoFile.getVideoFileName(),
@@ -102,7 +108,8 @@ public class VideoFileService {
             log.error("[uploadVideo] Erro durante upload de vídeo: {}", e.getMessage(), e);
             if (uploadedVideoFile != null) {
                 videoStatusManagerService.updateEntityStatus(
-                        videoFileRepository, uploadedVideoFile.getId(), VideoStatusEnum.ERROR, "VideoFileService - Falha no Upload");
+                        videoFileRepository, uploadedVideoFile.getId(), VideoStatusEnum.ERROR,
+                        "VideoFileService - Falha no Upload");
             }
             throw e;
         } finally {
@@ -110,6 +117,18 @@ public class VideoFileService {
             log.debug("[uploadVideo] Arquivo temporário removido: {}",
                     tempFile != null ? tempFile.getAbsolutePath() : "null");
         }
+    }
+
+    private UserAccount getCurrentUser() {
+
+        org.springframework.security.core.Authentication authentication = org.springframework.security.core.context.SecurityContextHolder
+                .getContext().getAuthentication();
+        if (authentication != null) {
+            String username = authentication.getName();
+            return userAccountRepository.findByUserName(username)
+                    .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+        }
+        throw new RuntimeException("Usuário não autenticado");
     }
 
     public VideoFile getVideoById(String id) {
@@ -136,7 +155,8 @@ public class VideoFileService {
         log.debug("[validateFileFormat] Arquivo válido: {}", file.getOriginalFilename());
     }
 
-    private VideoFile createVideoEntity(MultipartFile file, String filePath, String newFileName) throws IOException {
+    private VideoFile createVideoEntity(MultipartFile file, String filePath, String newFileName,
+            UserAccount userAccount) throws IOException {
         String extension = newFileName.substring(newFileName.lastIndexOf(".") + 1);
         String duration = VideoDurationUtils.getVideoDurationAsString(filePath);
 
@@ -152,6 +172,7 @@ public class VideoFileService {
         videoFile.setCreatedTimes(ZonedDateTime.now());
         videoFile.setUpdatedTimes(ZonedDateTime.now());
         videoFile.setStatus(VideoStatusEnum.PROCESSING);
+        videoFile.setUserAccount(userAccount);
 
         return videoFile;
     }

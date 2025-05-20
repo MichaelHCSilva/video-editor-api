@@ -64,7 +64,6 @@ public class VideoOverlayValidator {
     private boolean containsInvalidCharacters(String text) {
         if (text == null)
             return false;
-        // Permite letras, números e espaços de qualquer idioma
         Pattern pattern = Pattern.compile("[^\\p{L}\\p{N}\\s]");
         return pattern.matcher(text).find();
     }

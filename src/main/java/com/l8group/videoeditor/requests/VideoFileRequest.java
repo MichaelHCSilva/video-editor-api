@@ -11,6 +11,6 @@ import lombok.AllArgsConstructor;
 @AllArgsConstructor
 public class VideoFileRequest {
 
-    @NotNull(message = "O arquivo de vídeo é obrigatório.")
+    @NotNull(message = "O arquivo de vídeo é obrigatório e não pode estar em branco.")
     private MultipartFile file;
 }

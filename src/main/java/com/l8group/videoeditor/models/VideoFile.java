@@ -44,6 +44,10 @@ public class VideoFile {
     @Column(name = "video_file_path", nullable = false)
     private String videoFilePath;
 
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private UserAccount userAccount;
+
     @Column(nullable = false)
     private int retryCount = 0;
 }

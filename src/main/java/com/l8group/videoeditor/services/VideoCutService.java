@@ -18,13 +18,10 @@ import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.validation.VideoAudioValidator;
 import com.l8group.videoeditor.validation.VideoCutValidator;
 import io.micrometer.core.instrument.Timer;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.time.ZonedDateTime;
-import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,7 +45,17 @@ public class VideoCutService {
     private final VideoCutServiceMetrics videoCutServiceMetrics;
     private final VideoStatusManagerService videoStatusManagerService;
     private final VideoFileFinderService videoFileFinderService;
-    private final Validator validator;
+    
+
+    public void validateCutTimes(VideoCutRequest request, VideoFile videoFile) {
+        int startTime = VideoDurationUtils.convertTimeToSeconds(request.getStartTime());
+        int endTime = VideoDurationUtils.convertTimeToSeconds(request.getEndTime());
+        try {
+            VideoCutValidator.validateCutTimes(startTime, endTime, videoFile);
+        } catch (InvalidCutTimeException e) {
+            throw e; 
+        }
+    }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public String cutVideo(VideoCutRequest request, String previousFilePath) {
@@ -61,15 +68,6 @@ public class VideoCutService {
         if (!new File(inputFilePath).exists())
             throw new VideoProcessingException("Arquivo de vídeo não encontrado.");
 
-        Set<ConstraintViolation<VideoCutRequest>> violations = validator.validate(request);
-        if (!violations.isEmpty()) {
-            StringBuilder errorMessage = new StringBuilder("Erros na requisição de corte: ");
-            for (ConstraintViolation<VideoCutRequest> violation : violations) {
-                errorMessage.append(violation.getMessage()).append("; ");
-            }
-            throw new IllegalArgumentException(errorMessage.toString());
-        }
-
         String videoDuration;
         try {
             videoDuration = VideoDurationUtils.getVideoDurationAsString(inputFilePath);
@@ -81,17 +79,12 @@ public class VideoCutService {
 
         int startTime = VideoDurationUtils.convertTimeToSeconds(request.getStartTime());
         int endTime = VideoDurationUtils.convertTimeToSeconds(request.getEndTime());
-        try {
-            VideoCutValidator.validateCutTimes(startTime, endTime, videoFile);
-        } catch (InvalidCutTimeException e) {
-            throw e;
-        }
 
         try {
             VideoAudioValidator.validateAudioProperties(inputFilePath, startTime, endTime);
         } catch (InvalidMediaPropertiesException e) {
             log.error("Problema nas propriedades de áudio do vídeo: {}", e.getMessage());
-            throw e;
+            throw e; 
         }
 
         VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);

@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
+import com.l8group.videoeditor.exceptions.BatchValidationException; 
 import com.l8group.videoeditor.metrics.VideoBatchServiceMetrics;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
@@ -65,9 +66,20 @@ public class VideoBatchService {
 
         try {
             VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
-            videoOperationExecutor.validateAllOperations(request.getVideoIds().get(0), request.getOperations());
 
-            originalVideoFile = videoFileFinderService.findById(request.getVideoIds().get(0));
+            if (request.getVideoIds() == null || request.getVideoIds().isEmpty() || request.getVideoIds().get(0) == null) {
+                throw new BatchValidationException(List.of("Nenhum ID de vídeo fornecido."));
+            }
+            String videoId = request.getVideoIds().get(0);
+            originalVideoFile = videoFileFinderService.findById(videoId);
+            if (originalVideoFile == null) {
+                throw new BatchValidationException(List.of(
+                        "Operation error 'BATCH': Nenhum arquivo de vídeo encontrado correspondente ao ID: '" + videoId + "'"
+                ));
+            }
+
+            videoOperationExecutor.validateAllOperations(videoId, request.getOperations());
+
             currentInputFilePath = VideoFileStorageUtils.buildFilePath(UPLOAD_DIR,
                     originalVideoFile.getVideoFileName());
             outputFormat = originalVideoFile.getVideoFileFormat().replace(".", "");
@@ -87,7 +99,7 @@ public class VideoBatchService {
                         currentInputFilePath);
 
                 String nextOutputFilePath = videoOperationExecutor.execute(
-                        request.getVideoIds().get(0),
+                        videoId,
                         List.of(operation),
                         currentInputFilePath,
                         outputFormat);
@@ -151,6 +163,14 @@ public class VideoBatchService {
             return new VideoBatchResponseDTO(batchProcess.getId(), finalOutputFileName, batchProcess.getCreatedTimes(),
                     batchProcess.getProcessingSteps());
 
+        } catch (BatchValidationException e) {
+            videoBatchServiceMetrics.incrementBatchFailure();
+            videoBatchServiceMetrics.decrementProcessingQueueSize();
+            if (batchProcess != null) {
+                videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
+                        VideoStatusEnum.ERROR, "processBatch - Falha na validação");
+            }
+            throw e;
         } catch (Exception e) {
             videoBatchServiceMetrics.incrementBatchFailure();
             videoBatchServiceMetrics.decrementProcessingQueueSize();

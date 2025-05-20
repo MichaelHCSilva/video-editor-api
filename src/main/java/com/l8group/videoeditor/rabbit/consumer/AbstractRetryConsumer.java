@@ -34,7 +34,7 @@ public abstract class AbstractRetryConsumer {
                     }
                 } else {
                     logger.error("Erro após {} tentativas. Enviando para a DLQ automaticamente via RabbitMQ.", retryCount, e);
-                    throw e; // Isso deixa o Spring lidar com a DLQ
+                    throw e;
                 }
             }
         }

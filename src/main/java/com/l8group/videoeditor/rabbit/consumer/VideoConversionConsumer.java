@@ -33,12 +33,10 @@ public class VideoConversionConsumer extends AbstractRetryConsumer {
                 logger.info("Conversão de vídeo {} processada com sucesso. Status atualizado às: {}", videoConversionId, ZonedDateTime.now());
             } catch (IllegalArgumentException e) {
                 logger.error("Erro ao converter UUID: String '{}' não é um UUID válido. Detalhes: {}", videoConversionIdStr, e.getMessage());
-                // Enviar explicitamente para a DLQ após falha crítica
                 rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_CONVERSION_DLQ, videoConversionIdStr);
                 throw new RuntimeException("Erro no processamento da conversão de vídeo: " + e.getMessage(), e);
             } catch (Exception e) {
                 logger.error("Erro ao processar conversão de vídeo com ID '{}'. Detalhes: {}", videoConversionIdStr, e.getMessage());
-                // Enviar explicitamente para a DLQ após falha crítica
                 rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_CONVERSION_DLQ, videoConversionIdStr);
                 throw new RuntimeException("Erro no processamento da conversão de vídeo: " + e.getMessage(), e);
             }

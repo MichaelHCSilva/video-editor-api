@@ -3,7 +3,7 @@ package com.l8group.videoeditor.exceptions;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
-@ResponseStatus(HttpStatus.BAD_REQUEST) // Exemplo de status HTTP
+@ResponseStatus(HttpStatus.BAD_REQUEST) 
 public class InvalidMediaPropertiesException extends RuntimeException {
     public InvalidMediaPropertiesException(String message) {
         super(message);
