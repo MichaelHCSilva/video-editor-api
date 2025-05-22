@@ -1,6 +1,7 @@
 package com.l8group.videoeditor.services;
 
 import com.l8group.videoeditor.exceptions.ProcessedFileNotFoundException;
+import com.l8group.videoeditor.metrics.VideoDownloadMetrics; // Importar a classe de métricas
 import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.validation.VideoDownloadValidator;
 
@@ -19,8 +20,8 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
+import io.micrometer.core.instrument.Timer; 
 
-import java.io.InputStream;
 import java.net.URI;
 
 @Service
@@ -34,12 +35,15 @@ public class VideoDownloadService {
     private final S3Client s3Client;
     private final VideoProcessingBatchFinderService videoProcessingBatchFinderService;
     private final VideoDownloadValidator requestValidator;
+    private final VideoDownloadMetrics videoDownloadMetrics; 
 
     public VideoDownloadService(VideoProcessingBatchFinderService finderService,
-            VideoDownloadValidator requestValidator) {
+                                VideoDownloadValidator requestValidator,
+                                VideoDownloadMetrics videoDownloadMetrics) { 
         logger.info("Inicializando VideoDownloadService...");
         this.videoProcessingBatchFinderService = finderService;
         this.requestValidator = requestValidator;
+        this.videoDownloadMetrics = videoDownloadMetrics; 
         this.s3Client = S3Client.builder()
                 .region(Region.US_EAST_1)
                 .credentialsProvider(ProfileCredentialsProvider.create("editor-video-s3"))
@@ -50,35 +54,55 @@ public class VideoDownloadService {
 
     public ResponseEntity<InputStreamResource> downloadVideoStreamFromS3(String rawBatchProcessId) {
         logger.info("Iniciando downloadVideoStreamFromS3 para batchProcessId: {}", rawBatchProcessId);
-        requestValidator.validateRawBatchProcessId(rawBatchProcessId);
 
-        VideoProcessingBatch batch = videoProcessingBatchFinderService.findById(rawBatchProcessId);
-        requestValidator.validateVideoProcessingBatch(batch);
+        videoDownloadMetrics.incrementDownloadRequests();
+        Timer.Sample timer = videoDownloadMetrics.startDownloadTimer();
 
-        String filePath = batch.getVideoFilePath();
-        logger.info("Caminho do arquivo obtido do processamento em lote: {}", filePath);
-
-        String downloadFileName = filePath.substring(filePath.lastIndexOf('/') + 1);
-        logger.info("Nome do arquivo para download: {}", downloadFileName);
-
+        VideoProcessingBatch batch = null; 
         try {
-            InputStreamResource resource = fetchVideoFromS3(filePath);
+            requestValidator.validateRawBatchProcessId(rawBatchProcessId);
+
+            batch = videoProcessingBatchFinderService.findById(rawBatchProcessId);
+            requestValidator.validateVideoProcessingBatch(batch);
+
+            String filePath = batch.getVideoFilePath();
+            logger.info("Caminho do arquivo obtido do processamento em lote: {}", filePath);
+
+            String downloadFileName = filePath.substring(filePath.lastIndexOf('/') + 1);
+            logger.info("Nome do arquivo para download: {}", downloadFileName);
+
+            ResponseInputStream<GetObjectResponse> responseInputStream = fetchVideoFromS3Internal(filePath);
+            long contentLength = responseInputStream.response().contentLength();
+            InputStreamResource resource = new InputStreamResource(responseInputStream);
+
             logger.info("Arquivo de vídeo do S3 retornado com sucesso para batchProcessId: {}", rawBatchProcessId);
 
             HttpHeaders headers = new HttpHeaders();
             headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + downloadFileName + "\"");
             headers.add(HttpHeaders.CONTENT_TYPE, detectMimeType(downloadFileName));
+            headers.setContentLength(contentLength); 
+
+            videoDownloadMetrics.incrementSuccessfulDownloads();
+            videoDownloadMetrics.recordDownloadDuration(timer);
+            videoDownloadMetrics.addDownloadedFileSize(contentLength);
 
             return new ResponseEntity<>(resource, headers, HttpStatus.OK);
 
+        } catch (ProcessedFileNotFoundException e) {
+            videoDownloadMetrics.incrementFailedDownloads();
+            videoDownloadMetrics.recordDownloadDuration(timer);
+            logger.error("Erro ao acessar o arquivo no S3 para o caminho do lote {}. Erro: {}", rawBatchProcessId, e.getMessage());
+            throw e; 
         } catch (Exception e) {
-            logger.error("Erro ao acessar o arquivo no S3 para o caminho: {}. Erro: {}", filePath, e.getMessage());
-            throw new ProcessedFileNotFoundException("Erro ao acessar o arquivo no S3.");
+            videoDownloadMetrics.incrementFailedDownloads();
+            videoDownloadMetrics.recordDownloadDuration(timer);
+            logger.error("Erro inesperado durante o download do vídeo para o lote {}. Erro: {}", rawBatchProcessId, e.getMessage());
+            throw new RuntimeException("Erro interno ao processar o download do vídeo.", e);
         }
     }
 
-    private InputStreamResource fetchVideoFromS3(String filePath) {
-        logger.info("Iniciando fetchVideoFromS3 para o caminho: {}", filePath);
+    private ResponseInputStream<GetObjectResponse> fetchVideoFromS3Internal(String filePath) {
+        logger.info("Iniciando fetchVideoFromS3Internal para o caminho: {}", filePath);
         String key = filePath;
 
         if (filePath != null && filePath.startsWith("https://")) {
@@ -115,6 +139,7 @@ public class VideoDownloadService {
 
             } catch (Exception e) {
                 logger.error("Erro ao processar o URL do S3: {}", e.getMessage());
+                throw new ProcessedFileNotFoundException("Erro ao processar o URL do S3.", e); 
             }
         }
 
@@ -129,22 +154,11 @@ public class VideoDownloadService {
             logger.info("Fazendo requisição para obter objeto do S3: bucket={}, key={}", bucketName, key);
             responseInputStream = s3Client.getObject(getObjectRequest);
             logger.info("Objeto do S3 obtido com sucesso.");
+            return responseInputStream; 
         } catch (Exception e) {
             logger.error("Erro ao obter objeto do S3 (bucket={}, key={}): {}", bucketName, key, e.getMessage());
-            throw new ProcessedFileNotFoundException("Erro ao acessar o arquivo no S3.");
+            throw new ProcessedFileNotFoundException("Erro ao acessar o arquivo no S3.", e); 
         }
-
-        InputStream inputStream = responseInputStream != null ? responseInputStream : null;
-        logger.debug("InputStream obtido: {}", inputStream);
-
-        if (inputStream == null) {
-            logger.error("InputStream nulo retornado do S3 para o caminho: {}", filePath);
-            throw new ProcessedFileNotFoundException("Arquivo não encontrado no S3.");
-        }
-
-        InputStreamResource resource = new InputStreamResource(inputStream);
-        logger.info("InputStreamResource criado e retornado para o caminho: {}", filePath);
-        return resource;
     }
 
     private String detectMimeType(String filename) {
@@ -154,6 +168,6 @@ public class VideoDownloadService {
             return "video/avi";
         if (filename.endsWith(".mov"))
             return "video/quicktime";
-        return "application/octet-stream"; 
+        return "application/octet-stream";
     }
 }

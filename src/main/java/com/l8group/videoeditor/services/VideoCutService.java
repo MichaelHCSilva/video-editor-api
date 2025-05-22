@@ -5,7 +5,7 @@ import com.l8group.videoeditor.exceptions.InvalidCutTimeException;
 import com.l8group.videoeditor.exceptions.InvalidMediaPropertiesException;
 import com.l8group.videoeditor.exceptions.VideoMetadataException;
 import com.l8group.videoeditor.exceptions.VideoProcessingException;
-import com.l8group.videoeditor.metrics.VideoCutServiceMetrics;
+import com.l8group.videoeditor.metrics.VideoCutMetrics;
 import com.l8group.videoeditor.models.VideoCut;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoCutProducer;
@@ -42,7 +42,7 @@ public class VideoCutService {
 
     private final VideoCutRepository videoCutRepository;
     private final VideoCutProducer videoCutProducer;
-    private final VideoCutServiceMetrics videoCutServiceMetrics;
+    private final VideoCutMetrics videoCutServiceMetrics;
     private final VideoStatusManagerService videoStatusManagerService;
     private final VideoFileFinderService videoFileFinderService;
     
@@ -111,6 +111,7 @@ public class VideoCutService {
                 throw new VideoProcessingException("Falha ao processar o corte do vídeo.");
             }
 
+            videoCutServiceMetrics.incrementCutSuccess();
             videoStatusManagerService.updateEntityStatus(
                     videoCutRepository, videoCutEntity.getId(), VideoStatusEnum.COMPLETED, "CutService - Conclusão");
 

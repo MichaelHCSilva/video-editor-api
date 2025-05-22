@@ -16,7 +16,7 @@ import com.l8group.videoeditor.dtos.VideoFileListDTO;
 import com.l8group.videoeditor.dtos.VideoFileResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.NoVideosFoundException;
-import com.l8group.videoeditor.metrics.VideoFileServiceMetrics;
+import com.l8group.videoeditor.metrics.VideoFileMetrics;
 import com.l8group.videoeditor.models.UserAccount;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoProcessingProducer;
@@ -41,7 +41,7 @@ public class VideoFileService {
 
     private final VideoFileRepository videoFileRepository;
     private final VideoProcessingProducer videoProcessingProducer;
-    private final VideoFileServiceMetrics videoFileServiceMetrics;
+    private final VideoFileMetrics videoFileMetrics;
     private final VideoFileFinderService videoFileFinderService;
     private final VideoStatusManagerService videoStatusManagerService;
     private final UserRepository userAccountRepository;
@@ -49,8 +49,8 @@ public class VideoFileService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public VideoFileResponseDTO uploadVideo(MultipartFile file) throws IOException {
         log.info("[uploadVideo] Iniciando upload de vídeo: {}", file.getOriginalFilename());
-        videoFileServiceMetrics.incrementUploadRequests();
-        Timer.Sample sample = videoFileServiceMetrics.startUploadTimer();
+        videoFileMetrics.incrementUploadRequests();
+        Timer.Sample sample = videoFileMetrics.startUploadTimer();
         VideoFile uploadedVideoFile = null;
 
         File tempFile = null;
@@ -59,7 +59,7 @@ public class VideoFileService {
             validateFileFormat(file);
             log.debug("[uploadVideo] Formato de arquivo validado");
 
-            videoFileServiceMetrics.setFileSize(file.getSize());
+            videoFileMetrics.setFileSize(file.getSize());
 
             String originalFileName = file.getOriginalFilename();
             String newFileName = VideoFileNameGenerator.generateUniqueFileName(originalFileName);
@@ -93,8 +93,8 @@ public class VideoFileService {
             videoProcessingProducer.sendVideoId(uploadedVideoFile.getId());
             log.info("[uploadVideo] Enviado para RabbitMQ: VideoID {}", uploadedVideoFile.getId());
 
-            videoFileServiceMetrics.incrementUploadSuccess();
-            videoFileServiceMetrics.recordUploadDuration(sample);
+            videoFileMetrics.incrementUploadSuccess();
+            videoFileMetrics.recordUploadDuration(sample);
 
             log.info("[uploadVideo] Upload concluído com sucesso para o vídeo: {}",
                     uploadedVideoFile.getVideoFileName());
@@ -104,7 +104,7 @@ public class VideoFileService {
                     uploadedVideoFile.getCreatedTimes());
 
         } catch (Exception e) {
-            videoFileServiceMetrics.incrementFileValidationErrors();
+            videoFileMetrics.incrementFileValidationErrors();
             log.error("[uploadVideo] Erro durante upload de vídeo: {}", e.getMessage(), e);
             if (uploadedVideoFile != null) {
                 videoStatusManagerService.updateEntityStatus(

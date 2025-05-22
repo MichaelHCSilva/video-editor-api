@@ -28,7 +28,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler({
             VideoProcessingNotFoundException.class,
-            ProcessedFileNotFoundException.class
+            ProcessedFileNotFoundException.class,
+            NoVideosFoundException.class
     })
     public ResponseEntity<ErrorResponse> handleNotFound(RuntimeException ex) {
         String errorMessage = "Recurso não encontrado.";
@@ -36,6 +37,8 @@ public class GlobalExceptionHandler {
             errorMessage = ex.getMessage();
         } else if (ex instanceof ProcessedFileNotFoundException) {
             errorMessage = "O arquivo de vídeo processado não foi encontrado: " + ex.getMessage();
+        } else if (ex instanceof NoVideosFoundException) {
+            errorMessage = ex.getMessage();
         }
         return buildResponse(HttpStatus.NOT_FOUND, List.of(errorMessage), ex);
     }
@@ -58,11 +61,11 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleValidationException(Exception ex) {
         List<String> errors = (ex instanceof MethodArgumentNotValidException)
                 ? ((MethodArgumentNotValidException) ex).getBindingResult().getFieldErrors().stream()
-                        .map(fieldError -> fieldError.getDefaultMessage())
-                        .collect(Collectors.toList())
+                .map(fieldError -> fieldError.getDefaultMessage())
+                .collect(Collectors.toList())
                 : ((WebExchangeBindException) ex).getBindingResult().getFieldErrors().stream()
-                        .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                        .collect(Collectors.toList());
+                .map(error -> error.getField() + ": " + error.getDefaultMessage())
+                .collect(Collectors.toList());
 
         return buildResponse(HttpStatus.BAD_REQUEST, errors, ex);
     }
@@ -99,10 +102,9 @@ public class GlobalExceptionHandler {
             VideoMetadataException.class
     })
     public ResponseEntity<ErrorResponse> handleInternalProcessing(RuntimeException ex) {
-        if (ex.getMessage() != null && ex.getMessage().contains("Nenhum arquivo de vídeo encontrado")) {
-            return buildResponse(HttpStatus.NOT_FOUND, List.of(ex.getMessage()), ex);
-        }
-        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, List.of("Erro interno ao processar o vídeo."), ex);
+        // ✅ Aqui usamos a mensagem original da exceção
+        String errorMessage = ex.getMessage() != null ? ex.getMessage() : "Erro interno ao processar o vídeo.";
+        return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, List.of(errorMessage), ex);
     }
 
     @ExceptionHandler(BatchValidationException.class)
@@ -136,16 +138,18 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGeneric(Exception ex) {
+        log.error("Exceção inesperada capturada no manipulador genérico: {}", ex.getMessage(), ex);
         return buildResponse(HttpStatus.INTERNAL_SERVER_ERROR, List.of("Erro inesperado no sistema."), ex);
     }
 
     private ResponseEntity<ErrorResponse> buildResponse(HttpStatus status, List<String> errors, Exception ex) {
-        log.error("Exceção capturada: {}", ex.getMessage(), ex);
+        log.error("Exceção capturada (Status: {}): {}", status, ex.getMessage(), ex);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("X-Content-Type-Options", "nosniff");
         headers.remove("Content-Disposition");
         headers.set("Content-Transfer-Encoding", "text");
+
         return ResponseEntity.status(status)
                 .headers(headers)
                 .body(ErrorResponse.of(errors));

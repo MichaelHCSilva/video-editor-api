@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.BatchValidationException; 
-import com.l8group.videoeditor.metrics.VideoBatchServiceMetrics;
+import com.l8group.videoeditor.metrics.VideoBatchMetrics;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.rabbit.producer.VideoBatchProducer;
@@ -36,7 +36,7 @@ public class VideoBatchService {
 
     private final VideoBatchProcessRepository videoBatchProcessRepository;
     private final VideoBatchProducer videoBatchProducer;
-    private final VideoBatchServiceMetrics videoBatchServiceMetrics;
+    private final VideoBatchMetrics videoBatchServiceMetrics;
     private final VideoStatusManagerService videoStatusManagerService;
     private final VideoS3Service s3Service;
     private final VideoOperationExecutor videoOperationExecutor;
@@ -170,6 +170,7 @@ public class VideoBatchService {
                 videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
                         VideoStatusEnum.ERROR, "processBatch - Falha na validação");
             }
+            videoBatchServiceMetrics.recordBatchProcessingDuration(timerSample);
             throw e;
         } catch (Exception e) {
             videoBatchServiceMetrics.incrementBatchFailure();
@@ -178,9 +179,11 @@ public class VideoBatchService {
                 videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),
                         VideoStatusEnum.ERROR, "processBatch - Falha");
             }
+            videoBatchServiceMetrics.recordBatchProcessingDuration(timerSample);
+
             throw e;
         } finally {
-            videoBatchServiceMetrics.decrementProcessingQueueSize();
+            //videoBatchServiceMetrics.decrementProcessingQueueSize();
         }
     }
 }

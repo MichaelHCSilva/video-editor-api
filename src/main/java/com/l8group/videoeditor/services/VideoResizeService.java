@@ -3,7 +3,7 @@ package com.l8group.videoeditor.services;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.InvalidResizeParameterException;
 import com.l8group.videoeditor.exceptions.VideoProcessingException;
-import com.l8group.videoeditor.metrics.VideoResizeServiceMetrics;
+import com.l8group.videoeditor.metrics.VideoResizeMetrics;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoResize;
 import com.l8group.videoeditor.rabbit.producer.VideoResizeProducer;
@@ -13,6 +13,9 @@ import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
 import com.l8group.videoeditor.validation.VideoResizeValidator;
+
+//import io.micrometer.core.instrument.Metrics;
+import io.micrometer.core.instrument.Timer;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
 import lombok.RequiredArgsConstructor;
@@ -35,19 +38,20 @@ public class VideoResizeService {
 
     private final VideoResizeRepository videoResizeRepository;
     private final VideoResizeProducer videoResizeProducer;
-    private final VideoResizeServiceMetrics videoResizeServiceMetrics;
+    private final VideoResizeMetrics videoResizeMetrics;
     private final VideoFileFinderService videoFileFinderService;
     private final Validator validator;
-    private final VideoStatusManagerService videoStatusManagerService; 
+    private final VideoStatusManagerService videoStatusManagerService;
 
     @Value("${video.temp.dir}")
     private String tempDir;
 
     @Transactional
     public String resizeVideo(VideoResizeRequest request, String previousFilePath) {
-        log.info("[resizeVideo] Iniciando redimensionamento | VideoId: {} | Dimensões: {}x{}", request.getVideoId(), request.getWidth(), request.getHeight());
+        log.info("[resizeVideo] Iniciando redimensionamento | VideoId: {} | Dimensões: {}x{}",
+                request.getVideoId(), request.getWidth(), request.getHeight());
 
-        videoResizeServiceMetrics.incrementResizeRequests();
+        videoResizeMetrics.incrementResizeRequests();
 
         log.debug("[resizeVideo] Validando request via Bean Validation...");
         Set<ConstraintViolation<VideoResizeRequest>> violations = validator.validate(request);
@@ -76,17 +80,35 @@ public class VideoResizeService {
         VideoResize resizeEntity = saveResizeEntity(videoFile, request);
 
         log.info("[resizeVideo] Processando redimensionamento...");
+        Timer.Sample timerSample = videoResizeMetrics.startResizeTimer(); 
+
+
         try {
             processResize(inputFilePath, outputFilePath, request);
+
+            videoResizeMetrics.recordResizeDuration(timerSample); 
+            videoResizeMetrics.decrementProcessingQueueSize(); 
+
             videoStatusManagerService.updateEntityStatus(
-                    videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.COMPLETED, "VideoResizeService - Conclusão");
+                    videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.COMPLETED,
+                    "VideoResizeService - Conclusão");
+            videoResizeMetrics.incrementResizeSuccess();
+
         } catch (VideoProcessingException e) {
+            videoResizeMetrics.recordResizeDuration(timerSample); 
+            videoResizeMetrics.decrementProcessingQueueSize(); 
+            videoResizeMetrics.incrementResizeFailure();
             videoStatusManagerService.updateEntityStatus(
-                    videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.ERROR, "VideoResizeService - Processamento Falhou");
+                    videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.ERROR,
+                    "VideoResizeService - Processamento Falhou");
             throw e;
         } catch (Exception e) {
+            videoResizeMetrics.recordResizeDuration(timerSample); 
+            videoResizeMetrics.decrementProcessingQueueSize(); 
+            videoResizeMetrics.incrementResizeFailure();
             videoStatusManagerService.updateEntityStatus(
-                    videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.ERROR, "VideoResizeService - Erro Inesperado");
+                    videoResizeRepository, resizeEntity.getId(), VideoStatusEnum.ERROR,
+                    "VideoResizeService - Erro Inesperado");
             throw new VideoProcessingException("Erro inesperado ao redimensionar vídeo.", e);
         }
 
@@ -112,8 +134,7 @@ public class VideoResizeService {
         VideoFileStorageUtils.createDirectoryIfNotExists(tempDir);
 
         String outputPath = VideoFileStorageUtils.buildFilePath(
-                tempDir, VideoFileNameGenerator.generateFileNameWithSuffix(originalFileName, "resize")
-        );
+                tempDir, VideoFileNameGenerator.generateFileNameWithSuffix(originalFileName, "resize"));
 
         log.debug("[prepareOutputFile] Caminho do arquivo de saída preparado: {}", outputPath);
         return outputPath;
@@ -123,8 +144,7 @@ public class VideoResizeService {
         try {
             log.debug("[processResize] Chamando utilitário de redimensionamento...");
             boolean success = VideoProcessorUtils.resizeVideo(
-                    inputFilePath, outputFilePath, request.getWidth(), request.getHeight()
-            );
+                    inputFilePath, outputFilePath, request.getWidth(), request.getHeight());
 
             if (!success) {
                 log.error("[processResize] Redimensionamento falhou.");
@@ -133,7 +153,7 @@ public class VideoResizeService {
 
             try {
                 long fileSize = Files.size(Paths.get(outputFilePath));
-                videoResizeServiceMetrics.setResizeFileSize(fileSize);
+                videoResizeMetrics.setResizeFileSize(fileSize);
                 log.info("[processResize] Tamanho do vídeo redimensionado: {} bytes", fileSize);
             } catch (Exception e) {
                 log.warn("[processResize] Erro ao obter o tamanho do arquivo de saída: {}", e.getMessage());

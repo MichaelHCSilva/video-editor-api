@@ -13,8 +13,11 @@ public class VideoDownloadMetrics {
     private final Counter failedDownloads;
     private final Timer downloadDurationSeconds;
     private final AtomicLong totalDownloadedFileSize = new AtomicLong(0);
+    private final MeterRegistry registry; // Adicionado para ser usado no Timer.start()
 
     public VideoDownloadMetrics(MeterRegistry registry) {
+        this.registry = registry; // Atribuindo o registry
+
         totalDownloadRequests = Counter.builder("video_download_requests_total")
                 .description("Total de solicitações de download de vídeos")
                 .register(registry);
@@ -49,7 +52,7 @@ public class VideoDownloadMetrics {
     }
 
     public Timer.Sample startDownloadTimer() {
-        return Timer.start();
+        return Timer.start(registry);
     }
 
     public void recordDownloadDuration(Timer.Sample sample) {

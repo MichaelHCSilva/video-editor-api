@@ -30,7 +30,7 @@ public class UserService {
     @Transactional
     public UserResponseDto registerUser(UserRequest userRequest) {
         log.info("[{}] Iniciando o registro do usuário: {}", ZonedDateTime.now(), userRequest.getUserName());
-        log.debug("[{}] Instância de UserMetrics injetada: {}", ZonedDateTime.now(), userMetrics); // Adicione este log
+        log.debug("[{}] Instância de UserMetrics injetada: {}", ZonedDateTime.now(), userMetrics); 
         UserAccount savedUser = null;
 
         try {

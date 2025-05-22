@@ -2,7 +2,7 @@ package com.l8group.videoeditor.services;
 
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.VideoProcessingException;
-import com.l8group.videoeditor.metrics.VideoConversionServiceMetrics;
+import com.l8group.videoeditor.metrics.VideoConversionMetrics;
 import com.l8group.videoeditor.models.VideoConversion;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.rabbit.producer.VideoConversionProducer;
@@ -33,7 +33,7 @@ public class VideoConversionService {
     private final VideoFileFinderService videoFileFinderService;
     private final VideoConversionRepository videoConversionRepository;
     private final VideoConversionProducer videoConversionProducer;
-    private final VideoConversionServiceMetrics videoConversionServiceMetrics;
+    private final VideoConversionMetrics videoConversionServiceMetrics;
     private final VideoStatusManagerService videoStatusManagerService;
     private final VideoConversionValidator videoConversionValidator;
 
@@ -108,7 +108,7 @@ public class VideoConversionService {
 
     private void postConversionSuccess(Timer.Sample timer, String outputFilePath) {
         long fileSize = new File(outputFilePath).length();
-        videoConversionServiceMetrics.setConvertedFileSize(fileSize);
+        videoConversionServiceMetrics.addConvertedFileSize(fileSize);
         videoConversionServiceMetrics.recordConversionDuration(timer);
         videoConversionServiceMetrics.incrementConversionSuccess();
         videoConversionServiceMetrics.decrementProcessingQueueSize();
