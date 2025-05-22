@@ -36,4 +36,4 @@ build/
 **/videos
 **/temp
 
-.docker_aws/
+.docker_aws/credentials
