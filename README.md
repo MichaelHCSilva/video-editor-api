@@ -306,6 +306,18 @@ Após a inicialização via Docker, os seguintes serviços estarão disponíveis
 			
 		{__name__=~"video_batch_.*"}
 
+## ⚙️ Configuração do Prometheus para monitorar a API de edição de vídeos
+
+No arquivo `prometheus.yml`, configure o IP e porta do serviço da API que será monitorado. Exemplo:
+
+```yaml
+scrape_configs:
+  - job_name: 'video-editor-api'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['SEU_IP_AQUI:8080']
+```
+
 # 🔐 Autenticação com (JWT)
 
 Esta API utiliza **JSON Web Tokens (JWT)** para autenticação e autorização de usuários. Para acessar endpoints protegidos, é necessário registrar-se, realizar o login e incluir o token JWT nas requisições via cabeçalho `Authorization`.
