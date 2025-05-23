@@ -17,6 +17,7 @@ import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.BatchValidationException; 
 import com.l8group.videoeditor.metrics.VideoBatchMetrics;
+//import com.l8group.videoeditor.models.UserAccount;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.rabbit.producer.VideoBatchProducer;
@@ -41,6 +42,7 @@ public class VideoBatchService {
     private final VideoS3Service s3Service;
     private final VideoOperationExecutor videoOperationExecutor;
     private final VideoFileFinderService videoFileFinderService;
+    
 
     @Value("${video.upload.dir}")
     private String UPLOAD_DIR;
@@ -84,12 +86,18 @@ public class VideoBatchService {
                     originalVideoFile.getVideoFileName());
             outputFormat = originalVideoFile.getVideoFileFormat().replace(".", "");
 
+            
+
+
             batchProcess = new VideoProcessingBatch();
             batchProcess.setVideoFile(originalVideoFile);
             batchProcess.setStatus(VideoStatusEnum.PROCESSING);
             batchProcess.setCreatedTimes(ZonedDateTime.now());
             batchProcess.setUpdatedTimes(ZonedDateTime.now());
             batchProcess.setVideoFilePath(null);
+            batchProcess.setUserAccount(originalVideoFile.getUserAccount());
+
+            
             batchProcess.setProcessingSteps(request.getOperations().stream()
                     .map(VideoBatchRequest.BatchOperation::getOperationType).collect(Collectors.toList()));
             batchProcess = videoBatchProcessRepository.save(batchProcess);

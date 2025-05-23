@@ -44,4 +44,8 @@ public class VideoProcessingBatch {
 
     @Column(nullable = false)
     private int retryCount = 0;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
+    private UserAccount userAccount;
 }

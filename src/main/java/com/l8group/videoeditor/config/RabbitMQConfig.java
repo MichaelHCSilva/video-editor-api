@@ -44,6 +44,10 @@ public class RabbitMQConfig {
     public static final String VIDEO_BATCH_PROCESSING_ROUTING_KEY = "video.batch.process";
     public static final String VIDEO_BATCH_PROCESSING_DLQ = "video.batch.processing.dlq";
 
+    public static final String VIDEO_DOWNLOAD_QUEUE = "video.download.queue";
+    public static final String VIDEO_DOWNLOAD_ROUTING_KEY = "video.download";
+    public static final String VIDEO_DOWNLOAD_DLQ = "video.download.dlq";
+
     @Bean
     public Queue userStatusQueue() {
         return new Queue(USER_STATUS_QUEUE, true, false, false,
@@ -83,9 +87,15 @@ public class RabbitMQConfig {
     @Bean
     public Queue videoBatchProcessingQueue() {
         return new Queue(VIDEO_BATCH_PROCESSING_QUEUE, true, false, false,
-                Map.of("x-dead-letter-exchange", "video.exchange", "x-dead-letter-routing-key",
-                        VIDEO_BATCH_PROCESSING_DLQ));
+                Map.of("x-dead-letter-exchange", "video.exchange", "x-dead-letter-routing-key", VIDEO_BATCH_PROCESSING_DLQ));
     }
+
+    @Bean
+    public Queue videoDownloadQueue() {
+        return new Queue(VIDEO_DOWNLOAD_QUEUE, true, false, false,
+                Map.of("x-dead-letter-exchange", "video.exchange", "x-dead-letter-routing-key", VIDEO_DOWNLOAD_DLQ));
+    }
+
 
     @Bean
     public Queue userStatusDLQ() {
@@ -120,6 +130,11 @@ public class RabbitMQConfig {
     @Bean
     public Queue videoBatchProcessingDLQ() {
         return new Queue(VIDEO_BATCH_PROCESSING_DLQ, true);
+    }
+
+    @Bean
+    public Queue videoDownloadDLQ() {
+        return new Queue(VIDEO_DOWNLOAD_DLQ, true);
     }
 
     @Bean
@@ -164,6 +179,11 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Binding videoDownloadBinding(Queue videoDownloadQueue, TopicExchange videoExchange) {
+        return BindingBuilder.bind(videoDownloadQueue).to(videoExchange).with(VIDEO_DOWNLOAD_ROUTING_KEY);
+    }
+
+    @Bean
     public Binding videoProcessingDLQBinding(Queue videoProcessingDLQ, TopicExchange videoExchange) {
         return BindingBuilder.bind(videoProcessingDLQ).to(videoExchange).with(VIDEO_PROCESSING_DLQ);
     }
@@ -191,6 +211,11 @@ public class RabbitMQConfig {
     @Bean
     public Binding videoBatchProcessingDLQBinding(Queue videoBatchProcessingDLQ, TopicExchange videoExchange) {
         return BindingBuilder.bind(videoBatchProcessingDLQ).to(videoExchange).with(VIDEO_BATCH_PROCESSING_DLQ);
+    }
+
+    @Bean
+    public Binding videoDownloadDLQBinding(Queue videoDownloadDLQ, TopicExchange videoExchange) {
+        return BindingBuilder.bind(videoDownloadDLQ).to(videoExchange).with(VIDEO_DOWNLOAD_DLQ);
     }
 
     @Bean

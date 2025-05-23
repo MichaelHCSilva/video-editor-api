@@ -1,8 +1,12 @@
 package com.l8group.videoeditor.services;
 
+import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.ProcessedFileNotFoundException;
-import com.l8group.videoeditor.metrics.VideoDownloadMetrics; // Importar a classe de métricas
+import com.l8group.videoeditor.metrics.VideoDownloadMetrics;
+import com.l8group.videoeditor.models.VideoDownload;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
+import com.l8group.videoeditor.rabbit.producer.VideoDownloadProducer;
+import com.l8group.videoeditor.repositories.VideoDownloadRepository;
 import com.l8group.videoeditor.validation.VideoDownloadValidator;
 
 import org.slf4j.Logger;
@@ -20,9 +24,10 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.model.GetObjectResponse;
-import io.micrometer.core.instrument.Timer; 
+import io.micrometer.core.instrument.Timer;
 
 import java.net.URI;
+import java.time.ZonedDateTime;
 
 @Service
 public class VideoDownloadService {
@@ -35,15 +40,23 @@ public class VideoDownloadService {
     private final S3Client s3Client;
     private final VideoProcessingBatchFinderService videoProcessingBatchFinderService;
     private final VideoDownloadValidator requestValidator;
-    private final VideoDownloadMetrics videoDownloadMetrics; 
+    private final VideoDownloadMetrics videoDownloadMetrics;
+    private final VideoDownloadRepository videoDownloadRepository;
+    private final VideoDownloadProducer videoDownloadProducer;
 
     public VideoDownloadService(VideoProcessingBatchFinderService finderService,
-                                VideoDownloadValidator requestValidator,
-                                VideoDownloadMetrics videoDownloadMetrics) { 
+            VideoDownloadValidator requestValidator,
+            VideoDownloadMetrics videoDownloadMetrics,
+            VideoDownloadRepository videoDownloadRepository,
+            VideoDownloadProducer videoDownloadProducer) {
+
         logger.info("Inicializando VideoDownloadService...");
         this.videoProcessingBatchFinderService = finderService;
         this.requestValidator = requestValidator;
-        this.videoDownloadMetrics = videoDownloadMetrics; 
+        this.videoDownloadMetrics = videoDownloadMetrics;
+        this.videoDownloadRepository = videoDownloadRepository;
+        this.videoDownloadProducer = videoDownloadProducer;
+
         this.s3Client = S3Client.builder()
                 .region(Region.US_EAST_1)
                 .credentialsProvider(ProfileCredentialsProvider.create("editor-video-s3"))
@@ -58,7 +71,7 @@ public class VideoDownloadService {
         videoDownloadMetrics.incrementDownloadRequests();
         Timer.Sample timer = videoDownloadMetrics.startDownloadTimer();
 
-        VideoProcessingBatch batch = null; 
+        VideoProcessingBatch batch;
         try {
             requestValidator.validateRawBatchProcessId(rawBatchProcessId);
 
@@ -80,23 +93,27 @@ public class VideoDownloadService {
             HttpHeaders headers = new HttpHeaders();
             headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + downloadFileName + "\"");
             headers.add(HttpHeaders.CONTENT_TYPE, detectMimeType(downloadFileName));
-            headers.setContentLength(contentLength); 
+            headers.setContentLength(contentLength);
 
             videoDownloadMetrics.incrementSuccessfulDownloads();
             videoDownloadMetrics.recordDownloadDuration(timer);
             videoDownloadMetrics.addDownloadedFileSize(contentLength);
+
+            saveDownloadRecord(batch, downloadFileName); 
 
             return new ResponseEntity<>(resource, headers, HttpStatus.OK);
 
         } catch (ProcessedFileNotFoundException e) {
             videoDownloadMetrics.incrementFailedDownloads();
             videoDownloadMetrics.recordDownloadDuration(timer);
-            logger.error("Erro ao acessar o arquivo no S3 para o caminho do lote {}. Erro: {}", rawBatchProcessId, e.getMessage());
-            throw e; 
+            logger.error("Erro ao acessar o arquivo no S3 para o caminho do lote {}. Erro: {}", rawBatchProcessId,
+                    e.getMessage());
+            throw e;
         } catch (Exception e) {
             videoDownloadMetrics.incrementFailedDownloads();
             videoDownloadMetrics.recordDownloadDuration(timer);
-            logger.error("Erro inesperado durante o download do vídeo para o lote {}. Erro: {}", rawBatchProcessId, e.getMessage());
+            logger.error("Erro inesperado durante o download do vídeo para o lote {}. Erro: {}", rawBatchProcessId,
+                    e.getMessage(), e);
             throw new RuntimeException("Erro interno ao processar o download do vídeo.", e);
         }
     }
@@ -114,32 +131,21 @@ public class VideoDownloadService {
                 }
                 if (key.startsWith(bucketName + "/")) {
                     key = key.substring(bucketName.length() + 1);
-                    logger.debug("Chave ajustada removendo o nome do bucket: {}", key);
                 } else if (filePath.contains(".s3.amazonaws.com/")) {
-                    int index = filePath.indexOf(".s3.amazonaws.com/");
-                    if (index != -1) {
-                        key = filePath.substring(index + ".s3.amazonaws.com/".length());
-                        if (key.startsWith("/")) {
-                            key = key.substring(1);
-                        }
-                        logger.debug("Chave ajustada removendo o domínio padrão do S3: {}", key);
-                    }
+                    key = filePath.substring(filePath.indexOf(".s3.amazonaws.com/") + ".s3.amazonaws.com/".length());
                 } else if (filePath.contains(bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/")) {
-                    int index = filePath.indexOf(bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/");
-                    if (index != -1) {
-                        key = filePath.substring(
-                                index + (bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/").length());
-                        if (key.startsWith("/")) {
-                            key = key.substring(1);
-                        }
-                        logger.debug("Chave ajustada removendo o domínio regional do S3: {}", key);
-                    }
+                    key = filePath
+                            .substring(filePath.indexOf(bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/")
+                                    + (bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/").length());
                 }
-                logger.info("Chave S3 extraída do URL: {}", key);
+                if (key.startsWith("/")) {
+                    key = key.substring(1);
+                }
 
+                logger.info("Chave S3 extraída do URL: {}", key);
             } catch (Exception e) {
-                logger.error("Erro ao processar o URL do S3: {}", e.getMessage());
-                throw new ProcessedFileNotFoundException("Erro ao processar o URL do S3.", e); 
+                logger.error("Erro ao processar o URL do S3: {}", e.getMessage(), e);
+                throw new ProcessedFileNotFoundException("Erro ao processar o URL do S3.", e);
             }
         }
 
@@ -147,17 +153,13 @@ public class VideoDownloadService {
                 .bucket(bucketName)
                 .key(key)
                 .build();
-        logger.debug("GetObjectRequest construído: {}", getObjectRequest);
 
-        ResponseInputStream<GetObjectResponse> responseInputStream = null;
         try {
             logger.info("Fazendo requisição para obter objeto do S3: bucket={}, key={}", bucketName, key);
-            responseInputStream = s3Client.getObject(getObjectRequest);
-            logger.info("Objeto do S3 obtido com sucesso.");
-            return responseInputStream; 
+            return s3Client.getObject(getObjectRequest);
         } catch (Exception e) {
-            logger.error("Erro ao obter objeto do S3 (bucket={}, key={}): {}", bucketName, key, e.getMessage());
-            throw new ProcessedFileNotFoundException("Erro ao acessar o arquivo no S3.", e); 
+            logger.error("Erro ao obter objeto do S3 (bucket={}, key={}): {}", bucketName, key, e.getMessage(), e);
+            throw new ProcessedFileNotFoundException("Erro ao acessar o arquivo no S3.", e);
         }
     }
 
@@ -170,4 +172,34 @@ public class VideoDownloadService {
             return "video/quicktime";
         return "application/octet-stream";
     }
+
+    private void saveDownloadRecord(VideoProcessingBatch batch, String downloadFileName) {
+        try {
+            if (batch == null || downloadFileName == null || downloadFileName.isBlank()) {
+                logger.warn("Batch ou nome do arquivo de download inválido. Ignorando persistência.");
+                return;
+            }
+
+            logger.info("Salvando registro de download no banco para batchProcessId: {}", batch.getId());
+
+            VideoDownload download = new VideoDownload();
+            download.setVideoProcessingBatch(batch);
+            download.setDownloadFileName(downloadFileName);
+            download.setCreatedTimes(ZonedDateTime.now());
+            download.setUpdatedTimes(ZonedDateTime.now());
+            download.setStatus(VideoStatusEnum.PROCESSING);
+            download.setVideoFilePath(batch.getVideoFilePath());
+            download.setRetryCount(0);
+            download.setUserAccount(batch.getUserAccount());
+
+            videoDownloadRepository.save(download);
+            logger.info("Registro de download salvo com sucesso: {}", download.getId());
+
+            videoDownloadProducer.sendDownloadId(download.getId());
+
+        } catch (Exception e) {
+            logger.error("Erro ao salvar registro de download no banco: {}", e.getMessage(), e);
+        }
+    }
+
 }

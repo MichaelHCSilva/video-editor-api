@@ -5,4 +5,4 @@ scrape_configs:
   - job_name: 'video-editor-api'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['SEU_IP_AQUI:8080']
+      - targets: ['172.17.198.250:8080']
