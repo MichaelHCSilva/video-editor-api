@@ -36,8 +36,8 @@ public class VideoDownload {
     @Column(name = "status", nullable = false)
     private VideoStatusEnum status;
 
-    @Column(name = "video_file_path", nullable = true)
-    private String videoFilePath;
+    @Column(name = "s3_url", columnDefinition = "TEXT", nullable = true)
+    private String s3Url;
 
     @Column(nullable = false)
     private int retryCount = 0;

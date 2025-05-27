@@ -1,8 +1,8 @@
 # 🎬 Video Editor API
 
   
-O Video Editor API da **L8Group** é uma solução  para edição e manipulação de vídeos. Ela usa FFmpeg para operações como corte, redimensionamento, sobreposição de texto e conversão de formatos. Para garantir eficiência, a API utiliza RabbitMQ para processamento assíncrono e armazena os vídeos no AWS S3. Desenvolvida com Spring Boot 3 e Java 17, oferece segurança com JWT e monitoramento detalhado via Prometheus.
----
+
+A **Video Editor API** da **L8Group** é desenvolvida com **Java 17** e **Spring Boot 3**, a API integra o **FFmpeg** para realizar operações avançadas, como **corte**, **redimensionamento**, **inserção de sobreposição de texto** (watermark) e **conversão de formatos**. Para garantir alto desempenho e escalabilidade, o processamento é realizado de forma **assíncrona** por meio do **RabbitMQ**, permitindo a manipulação eficiente de milhares de vídeos por dia. Os arquivos processados são armazenados com segurança na **AWS S3**, otimizando o gerenciamento e a distribuição de conteúdo. A API também incorpora autenticação e autorização por meio de **JWT (JSON Web Token)**, assegurando o controle de acesso às funcionalidades. Além disso, o sistema conta com **monitoramento detalhado** e métricas expostas via **Prometheus**, facilitando a observabilidade, a detecção de falhas e a manutenção preventiva.
 
 ## 📦 Tecnologias e Bibliotecas Principais
 
@@ -13,7 +13,7 @@ O Video Editor API da **L8Group** é uma solução  para edição e manipulaçã
 - 🐰 RabbitMQ
 - ☁️ AWS SDK v2 – S3
 - 🐘 PostgreSQL
-- 🔐 JWT (jjwt)
+- 🔐 JWT 
 - 📊 Prometheus
 - ✨ Lombok 
 ---
@@ -33,7 +33,7 @@ O Video Editor API da **L8Group** é uma solução  para edição e manipulaçã
 
 # 👤 Configuração de Usuário IAM e Credenciais AWS para o Projeto `video-editor-api`
 
-Como criar e configurar um usuário IAM com permissões adequadas para acesso ao Amazon S3, utilizado no projeto `video-editor-api`.
+Criar e configurar um usuário IAM com permissões adequadas para acesso ao Amazon S3, utilizado no projeto `video-editor-api`.
 
 ----------
 
@@ -48,7 +48,7 @@ Como criar e configurar um usuário IAM com permissões adequadas para acesso ao
     
 3.  Preencha as informações básicas:
     
-    -   **User name**: `seu-nome-personalizado` (ex.: `video-editor-api-user`)
+    -   **User name**: `seu-nome-personalizado` (ex.: `calos.souza`)
         
 4.  Clique em **Next** para avançar à etapa de permissões.
     
@@ -137,7 +137,7 @@ output = json
 [editor-video-s3]
 
 aws_access_key_id = SUA_ACCESS_KEY_ID 
-aws_secret_access_key = SUA_SECRET_ACCESS_KEY` 
+aws_secret_access_key = SUA_SECRET_ACCESS_KEY 
 ```
 
 ---
@@ -174,9 +174,9 @@ Esta seção descreve como criar e configurar corretamente o bucket S3 `api-edit
         
     -   Escolha: ✅ `Bucket owner enforced`
         
-5.  Em **Block Public Access settings**:
+5.  Em **Block Public Access settings for this bucket**:
     
-    -   Para ambientes privados: **Mantenha todas as opções marcadas (recomendado)**
+    -    **Mantenha todas as opções marcadas**
 
 6.  Clique em **Create bucket**.
 
@@ -201,23 +201,25 @@ Esta seção descreve como criar e configurar corretamente o bucket S3 `api-edit
 
 ```json
 {
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": "*",
-            "Action": "s3:PutObject",
-            "Resource": "arn:aws:s3:::api-editor-video/*"
-        },
-        {
-            "Effect": "Allow",
-            "Principal": "*",
-            "Action": "s3:GetObject",
-            "Resource": "arn:aws:s3:::api-editor-video/*"
-        }
-    ]
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "AllowAppAccess",
+			"Effect": "Allow",
+			"Principal": {
+				"AWS": "arn:aws:iam::123456789012:user/seu-usuario"
+			},
+			"Action": [
+				"s3:GetObject",
+				"s3:PutObject"
+			],
+			"Resource": "arn:aws:s3:::api-editor-video/*"
+		}
+	]
 }
 ```
+
+### 💡Substitua `123456789012` pelo seu ID da conta AWS e `seu-usuario` pelo nome exato do seu IAM User.
 
 ---
 
@@ -227,21 +229,39 @@ Esta seção descreve como criar e configurar corretamente o bucket S3 `api-edit
   
 ```bash
 git clone https://github.com/MichaelHCSilva/video-editor-api.git
-cd video-editor-api
 ```
+---
+## ⚙️ Configuração do Prometheus para monitorar a API de edição de vídeos
+
+No arquivo `prometheus.yml`, configure o IP e porta do serviço da API que será monitorado. Exemplo:
+
+```yaml
+scrape_configs:
+  - job_name: 'video-editor-api'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['SEU_IP_AQUI:8080']
+```
+---
+
+
+
 
 # 🐳  Inicialização com Docker Compose
 
 A aplicação é composta por múltiplos serviços (API de edição de vídeos, RabbitMQ, Prometheus etc.). Utilize o seguinte comando para **construir** e **iniciar todos os containers**:
 
+A aplicação é composta por múltiplos serviços, incluindo:
 
+- API de edição de vídeos
+- RabbitMQ
+- Prometheus
+
+### 🔧 Para construir e iniciar todos os containers:
 ```bash
 docker compose up --build
 ```
-> 💡 Se desejar apenas iniciar os containers sem reconstruí-los:
-```bash
-docker compose up
-```
+
 
 # 🚀Serviços Auxiliares Disponíveis
 
@@ -306,17 +326,8 @@ Após a inicialização via Docker, os seguintes serviços estarão disponíveis
 			
 		{__name__=~"video_batch_.*"}
 
-## ⚙️ Configuração do Prometheus para monitorar a API de edição de vídeos
 
-No arquivo `prometheus.yml`, configure o IP e porta do serviço da API que será monitorado. Exemplo:
-
-```yaml
-scrape_configs:
-  - job_name: 'video-editor-api'
-    metrics_path: '/actuator/prometheus'
-    static_configs:
-      - targets: ['SEU_IP_AQUI:8080']
-```
+---
 
 # 🔐 Autenticação com (JWT)
 

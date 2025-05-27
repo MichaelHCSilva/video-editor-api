@@ -15,7 +15,7 @@ import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.services.VideoS3Service;
-import com.l8group.videoeditor.services.VideoStatusManagerService;
+import com.l8group.videoeditor.services.VideoStatusService;
 
 @Component
 public class VideoRetryScheduler {
@@ -27,10 +27,10 @@ public class VideoRetryScheduler {
 
     private final VideoFileRepository videoFileRepository;
     private final VideoS3Service s3Service;
-    private final VideoStatusManagerService videoStatusManagerService;
+    private final VideoStatusService videoStatusManagerService;
 
     public VideoRetryScheduler(VideoFileRepository videoFileRepository, VideoS3Service s3Service,
-                               VideoStatusManagerService videoStatusManagerService) {
+                               VideoStatusService videoStatusManagerService) {
         this.videoFileRepository = videoFileRepository;
         this.s3Service = s3Service;
         this.videoStatusManagerService = videoStatusManagerService;

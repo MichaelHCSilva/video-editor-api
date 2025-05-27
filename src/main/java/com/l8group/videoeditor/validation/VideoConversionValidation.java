@@ -7,7 +7,7 @@ import org.springframework.util.StringUtils;
 import java.util.regex.Pattern;
 
 @Component
-public class VideoConversionValidator {
+public class VideoConversionValidation {
 
     public void validateVideoId(String videoId) {
         if (videoId == null || videoId.trim().isEmpty()) {

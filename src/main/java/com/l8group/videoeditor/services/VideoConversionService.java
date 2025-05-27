@@ -11,7 +11,7 @@ import com.l8group.videoeditor.requests.VideoConversionRequest;
 import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
-import com.l8group.videoeditor.validation.VideoConversionValidator;
+import com.l8group.videoeditor.validation.VideoConversionValidation;
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +34,8 @@ public class VideoConversionService {
     private final VideoConversionRepository videoConversionRepository;
     private final VideoConversionProducer videoConversionProducer;
     private final VideoConversionMetrics videoConversionServiceMetrics;
-    private final VideoStatusManagerService videoStatusManagerService;
-    private final VideoConversionValidator videoConversionValidator;
+    private final VideoStatusService videoStatusManagerService;
+    private final VideoConversionValidation videoConversionValidator;
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;

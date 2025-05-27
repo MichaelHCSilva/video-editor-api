@@ -17,11 +17,10 @@ import com.l8group.videoeditor.dtos.VideoBatchResponseDTO;
 import com.l8group.videoeditor.enums.VideoStatusEnum;
 import com.l8group.videoeditor.exceptions.BatchValidationException; 
 import com.l8group.videoeditor.metrics.VideoBatchMetrics;
-//import com.l8group.videoeditor.models.UserAccount;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.rabbit.producer.VideoBatchProducer;
-import com.l8group.videoeditor.repositories.VideoBatchProcessRepository;
+import com.l8group.videoeditor.repositories.VideoBatchRepository;
 import com.l8group.videoeditor.requests.VideoBatchRequest;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoFileStorageUtils;
@@ -35,12 +34,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class VideoBatchService {
 
-    private final VideoBatchProcessRepository videoBatchProcessRepository;
+    private final VideoBatchRepository videoBatchProcessRepository;
     private final VideoBatchProducer videoBatchProducer;
     private final VideoBatchMetrics videoBatchServiceMetrics;
-    private final VideoStatusManagerService videoStatusManagerService;
+    private final VideoStatusService videoStatusManagerService;
     private final VideoS3Service s3Service;
-    private final VideoOperationExecutor videoOperationExecutor;
+    private final VideoOperationService videoOperationExecutor;
     private final VideoFileFinderService videoFileFinderService;
     
 
@@ -94,7 +93,7 @@ public class VideoBatchService {
             batchProcess.setStatus(VideoStatusEnum.PROCESSING);
             batchProcess.setCreatedTimes(ZonedDateTime.now());
             batchProcess.setUpdatedTimes(ZonedDateTime.now());
-            batchProcess.setVideoFilePath(null);
+            batchProcess.setS3Url(null);
             batchProcess.setUserAccount(originalVideoFile.getUserAccount());
 
             
@@ -154,7 +153,7 @@ public class VideoBatchService {
 
             String processedFileUrl = s3Service.uploadProcessedFile(finalOutputPath.toFile(), finalOutputFileName,
                     originalVideoFile.getId());
-            batchProcess.setVideoFilePath(processedFileUrl);
+            batchProcess.setS3Url(processedFileUrl);
             videoBatchProcessRepository.save(batchProcess);
 
             videoStatusManagerService.updateEntityStatus(videoBatchProcessRepository, batchProcess.getId(),

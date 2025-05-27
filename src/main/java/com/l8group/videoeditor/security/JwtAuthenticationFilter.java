@@ -35,10 +35,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             throws ServletException, java.io.IOException {
 
         String authorizationHeader = request.getHeader("Authorization");
-        log.info("Authorization header received: {}", authorizationHeader);
+        log.info("Cabeçalho de autorização recebido: {}", authorizationHeader);
 
         if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-            log.warn("Authorization header is missing or invalid");
+            log.warn("Cabeçalho 'Authorization' ausente ou malformado.");
             filterChain.doFilter(request, response);
             return;
         }
@@ -46,7 +46,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = authorizationHeader.substring(7);
         try {
             String username = jwtService.extractUsername(token);
-            log.info("Token validated for user: {}", username);
+            log.info("Token extraído com sucesso. Usuário: {}", username);
 
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
@@ -55,13 +55,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     SecurityContextHolder.getContext().setAuthentication(authentication);
-                    log.info("Authentication successful for: {}", username);
+                    log.warn("Falha na validação do token JWT para o usuário: {}", username);
                 } else {
                     log.warn("Token validation failed");
                 }
             }
         } catch (JwtException e) {
-            log.error("Error validating JWT token: {}", e.getMessage(), e);
+            log.error("Erro ao validar o token JWT: {}", e.getMessage(), e);
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\": \"Token inválido ou expirado.\"}");

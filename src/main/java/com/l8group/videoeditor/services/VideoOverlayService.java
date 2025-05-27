@@ -11,7 +11,7 @@ import com.l8group.videoeditor.requests.VideoOverlayRequest;
 import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoOverlayUtils;
-import com.l8group.videoeditor.validation.VideoOverlayValidator;
+import com.l8group.videoeditor.validation.VideoOverlayValidation;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,8 +31,8 @@ public class VideoOverlayService {
     private final VideoOverlayProducer videoOverlayProducer;
     private final VideoOverlayMetrics metrics;
     private final VideoFileFinderService videoFileFinderService;
-    private final VideoOverlayValidator videoOverlayValidator;
-    private final VideoStatusManagerService videoStatusManagerService;
+    private final VideoOverlayValidation videoOverlayValidator;
+    private final VideoStatusService videoStatusManagerService;
 
     @Value("${video.temp.dir}")
     private String TEMP_DIR;

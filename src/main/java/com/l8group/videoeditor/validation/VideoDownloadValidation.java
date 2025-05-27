@@ -8,7 +8,7 @@ import org.springframework.util.StringUtils;
 import java.util.UUID;
 
 @Component
-public class VideoDownloadValidator {
+public class VideoDownloadValidation {
 
     public void validateRawBatchProcessId(String rawBatchProcessId) {
         if (!StringUtils.hasText(rawBatchProcessId)) {
@@ -22,7 +22,7 @@ public class VideoDownloadValidator {
     }
 
     public void validateVideoProcessingBatch(VideoProcessingBatch batch) {
-        if (batch == null || !StringUtils.hasText(batch.getVideoFilePath())) {
+        if (batch == null || !StringUtils.hasText(batch.getS3Url())) {
             throw new InvalidRequestException("O caminho do arquivo de vídeo não foi encontrado para este processo.");
         }
         

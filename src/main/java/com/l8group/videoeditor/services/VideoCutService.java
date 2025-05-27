@@ -15,8 +15,8 @@ import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
-import com.l8group.videoeditor.validation.VideoAudioValidator;
-import com.l8group.videoeditor.validation.VideoCutValidator;
+import com.l8group.videoeditor.validation.VideoAudioValidation;
+import com.l8group.videoeditor.validation.VideoCutValidation;
 import io.micrometer.core.instrument.Timer;
 import java.io.File;
 import java.io.IOException;
@@ -43,17 +43,16 @@ public class VideoCutService {
     private final VideoCutRepository videoCutRepository;
     private final VideoCutProducer videoCutProducer;
     private final VideoCutMetrics videoCutServiceMetrics;
-    private final VideoStatusManagerService videoStatusManagerService;
+    private final VideoStatusService videoStatusManagerService;
     private final VideoFileFinderService videoFileFinderService;
-    
 
     public void validateCutTimes(VideoCutRequest request, VideoFile videoFile) {
         int startTime = VideoDurationUtils.convertTimeToSeconds(request.getStartTime());
         int endTime = VideoDurationUtils.convertTimeToSeconds(request.getEndTime());
         try {
-            VideoCutValidator.validateCutTimes(startTime, endTime, videoFile);
+            VideoCutValidation.validateCutTimes(startTime, endTime, videoFile);
         } catch (InvalidCutTimeException e) {
-            throw e; 
+            throw e;
         }
     }
 
@@ -81,16 +80,16 @@ public class VideoCutService {
         int endTime = VideoDurationUtils.convertTimeToSeconds(request.getEndTime());
 
         try {
-            VideoAudioValidator.validateAudioProperties(inputFilePath, startTime, endTime);
+            VideoAudioValidation.validateAudioProperties(inputFilePath, startTime, endTime);
         } catch (InvalidMediaPropertiesException e) {
             log.error("Problema nas propriedades de áudio do vídeo: {}", e.getMessage());
-            throw e; 
+            throw e;
         }
 
         VideoFileStorageUtils.createDirectoryIfNotExists(TEMP_DIR);
-        String uniqueFileName = VideoFileNameGenerator.generateUniqueFileName(videoFile.getVideoFileName());
         String outputFilePath = Paths
-                .get(TEMP_DIR, VideoFileNameGenerator.generateFileNameWithSuffix(uniqueFileName, "cut")).toString();
+                .get(TEMP_DIR, VideoFileNameGenerator.generateFileNameWithSuffix(videoFile.getVideoFileName(), "cut"))
+                .toString();
 
         videoCutServiceMetrics.incrementProcessingQueueSize();
         Timer.Sample timer = videoCutServiceMetrics.startCutTimer();

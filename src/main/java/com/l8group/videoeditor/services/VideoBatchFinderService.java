@@ -2,7 +2,7 @@ package com.l8group.videoeditor.services;
 
 import com.l8group.videoeditor.exceptions.VideoProcessingNotFoundException;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
-import com.l8group.videoeditor.repositories.VideoBatchProcessRepository;
+import com.l8group.videoeditor.repositories.VideoBatchRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -10,9 +10,9 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-public class VideoProcessingBatchFinderService {
+public class VideoBatchFinderService {
 
-    private final VideoBatchProcessRepository videoBatchProcessRepository;
+    private final VideoBatchRepository videoBatchProcessRepository;
 
     public VideoProcessingBatch findById(UUID id) {
         return videoBatchProcessRepository.findById(id)

@@ -25,7 +25,7 @@ import com.l8group.videoeditor.repositories.VideoFileRepository;
 import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoDurationUtils;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
-import com.l8group.videoeditor.validation.VideoValidationExecutor;
+import com.l8group.videoeditor.validation.VideoFileValidation;
 
 import io.micrometer.core.instrument.Timer;
 import lombok.RequiredArgsConstructor;
@@ -43,8 +43,9 @@ public class VideoFileService {
     private final VideoProcessingProducer videoProcessingProducer;
     private final VideoFileMetrics videoFileMetrics;
     private final VideoFileFinderService videoFileFinderService;
-    private final VideoStatusManagerService videoStatusManagerService;
+    private final VideoStatusService videoStatusManagerService;
     private final UserRepository userAccountRepository;
+    private final VideoS3Service videoS3Service;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public VideoFileResponseDTO uploadVideo(MultipartFile file) throws IOException {
@@ -74,7 +75,7 @@ public class VideoFileService {
             file.transferTo(tempFile);
             log.info("[uploadVideo] Arquivo salvo temporariamente em: {}", tempFile.getAbsolutePath());
 
-            VideoValidationExecutor.validateWithFFmpeg(tempFile.getAbsolutePath());
+            VideoFileValidation.validateWithFFmpeg(tempFile.getAbsolutePath());
             log.info("[uploadVideo] Validação FFmpeg concluída com sucesso");
 
             Path targetPath = Path.of(finalFilePath);
@@ -83,6 +84,10 @@ public class VideoFileService {
 
             UserAccount userAccount = getCurrentUser();
             VideoFile videoFile = createVideoEntity(file, finalFilePath, newFileName, userAccount);
+
+            String s3Url = videoS3Service.uploadRawFile(targetPath.toFile(), newFileName, videoFile.getId());
+            log.info("[uploadVideo] Arquivo enviado ao S3 com URL: {}", s3Url);
+
             uploadedVideoFile = videoFileRepository.save(videoFile);
             log.info("[uploadVideo] Entidade VideoFile salva com ID: {}", uploadedVideoFile.getId());
 

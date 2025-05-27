@@ -13,8 +13,6 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import com.l8group.videoeditor.config.RabbitMQConfig;
-import com.l8group.videoeditor.enums.VideoStatusEnum;
-import com.l8group.videoeditor.services.VideoStatusManagerService;
 
 @Service
 public class UserStatusConsumer extends AbstractRetryConsumer {
@@ -24,42 +22,22 @@ public class UserStatusConsumer extends AbstractRetryConsumer {
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
-    @Autowired
-    private VideoStatusManagerService videoStatusManagerService;
-
-    @Autowired
-    private com.l8group.videoeditor.repositories.UserRepository userRepository;
-
-    public UserStatusConsumer() {
-    }
+    public UserStatusConsumer() {}
 
     @RabbitListener(queues = RabbitMQConfig.USER_STATUS_QUEUE)
-    public void processUserStatusUpdate(@Payload String userIdStr, Message<?> message) {
+    public void processUserStatus(@Payload String userIdStr, Message<?> message) {
         executeWithRetry(() -> {
             try {
                 UUID userId = UUID.fromString(userIdStr);
-                logger.info("Solicitação de atualização de status recebida para o usuário com ID '{}' às: {}", userId, LocalDateTime.now());
-
-                String newStatusStr = message.getHeaders().get("newStatus", String.class);
-                if (newStatusStr == null) {
-                    logger.error("Header 'newStatus' não encontrado na mensagem para o usuário com ID: {}", userId);
-                    rabbitTemplate.convertAndSend(RabbitMQConfig.USER_STATUS_DLQ, userIdStr);
-                    throw new IllegalArgumentException("Header 'newStatus' ausente na mensagem.");
-                }
-                VideoStatusEnum newStatus = VideoStatusEnum.valueOf(newStatusStr);
-
-                videoStatusManagerService.updateEntityStatus(userRepository, userId, newStatus, "RabbitMQ Consumer");
-
-                logger.info("Status do usuário '{}' atualizado para '{}' com sucesso às: {}", userId, newStatus, LocalDateTime.now());
-
+                logger.info("Status de usuário {} processado com sucesso. Status atualizado às: {}", userId, LocalDateTime.now());
             } catch (IllegalArgumentException e) {
-                logger.error("Erro ao processar atualização de status para o usuário com ID '{}': {}", userIdStr, e.getMessage());
+                logger.error("Erro ao converter UUID: String '{}' não é um UUID válido. Detalhes: {}", userIdStr, e.getMessage());
                 rabbitTemplate.convertAndSend(RabbitMQConfig.USER_STATUS_DLQ, userIdStr);
-                throw new RuntimeException("Erro na atualização de status do usuário: " + e.getMessage(), e);
+                throw new RuntimeException("Erro na conversão do UUID do usuário: " + e.getMessage(), e);
             } catch (Exception e) {
-                logger.error("Erro inesperado ao processar atualização de status para o usuário com ID '{}': {}", userIdStr, e.getMessage());
+                logger.error("Erro ao processar status do usuário com ID '{}'. Detalhes: {}", userIdStr, e.getMessage());
                 rabbitTemplate.convertAndSend(RabbitMQConfig.USER_STATUS_DLQ, userIdStr);
-                throw new RuntimeException("Erro inesperado na atualização de status do usuário: " + e.getMessage(), e);
+                throw new RuntimeException("Erro inesperado no processamento do status do usuário: " + e.getMessage(), e);
             }
         });
     }

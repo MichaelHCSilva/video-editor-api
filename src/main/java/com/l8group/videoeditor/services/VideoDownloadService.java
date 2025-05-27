@@ -7,7 +7,7 @@ import com.l8group.videoeditor.models.VideoDownload;
 import com.l8group.videoeditor.models.VideoProcessingBatch;
 import com.l8group.videoeditor.rabbit.producer.VideoDownloadProducer;
 import com.l8group.videoeditor.repositories.VideoDownloadRepository;
-import com.l8group.videoeditor.validation.VideoDownloadValidator;
+import com.l8group.videoeditor.validation.VideoDownloadValidation;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,57 +38,66 @@ public class VideoDownloadService {
     private String bucketName;
 
     private final S3Client s3Client;
-    private final VideoProcessingBatchFinderService videoProcessingBatchFinderService;
-    private final VideoDownloadValidator requestValidator;
+    private final VideoBatchFinderService videoProcessingBatchFinderService;
+    private final VideoDownloadValidation requestValidator;
     private final VideoDownloadMetrics videoDownloadMetrics;
     private final VideoDownloadRepository videoDownloadRepository;
     private final VideoDownloadProducer videoDownloadProducer;
+    private final VideoStatusService videoStatusManagerService;
 
-    public VideoDownloadService(VideoProcessingBatchFinderService finderService,
-            VideoDownloadValidator requestValidator,
+    public VideoDownloadService(
+            VideoBatchFinderService finderService,
+            VideoDownloadValidation requestValidator,
             VideoDownloadMetrics videoDownloadMetrics,
             VideoDownloadRepository videoDownloadRepository,
-            VideoDownloadProducer videoDownloadProducer) {
+            VideoDownloadProducer videoDownloadProducer,
+            VideoStatusService videoStatusManagerService) {
 
-        logger.info("Inicializando VideoDownloadService...");
         this.videoProcessingBatchFinderService = finderService;
         this.requestValidator = requestValidator;
         this.videoDownloadMetrics = videoDownloadMetrics;
         this.videoDownloadRepository = videoDownloadRepository;
         this.videoDownloadProducer = videoDownloadProducer;
+        this.videoStatusManagerService = videoStatusManagerService;
 
         this.s3Client = S3Client.builder()
                 .region(Region.US_EAST_1)
                 .credentialsProvider(ProfileCredentialsProvider.create("editor-video-s3"))
                 .build();
+
         logger.info("S3 Client configurado para a região: {}", Region.US_EAST_1.id());
         logger.info("VideoDownloadService inicializado.");
     }
 
     public ResponseEntity<InputStreamResource> downloadVideoStreamFromS3(String rawBatchProcessId) {
-        logger.info("Iniciando downloadVideoStreamFromS3 para batchProcessId: {}", rawBatchProcessId);
-
+        logger.info("Iniciando download para batchProcessId: {}", rawBatchProcessId);
         videoDownloadMetrics.incrementDownloadRequests();
         Timer.Sample timer = videoDownloadMetrics.startDownloadTimer();
 
-        VideoProcessingBatch batch;
+        VideoDownload savedDownload = null;
+
         try {
             requestValidator.validateRawBatchProcessId(rawBatchProcessId);
-
-            batch = videoProcessingBatchFinderService.findById(rawBatchProcessId);
+            VideoProcessingBatch batch = videoProcessingBatchFinderService.findById(rawBatchProcessId);
             requestValidator.validateVideoProcessingBatch(batch);
 
-            String filePath = batch.getVideoFilePath();
-            logger.info("Caminho do arquivo obtido do processamento em lote: {}", filePath);
+            String filePath = batch.getS3Url();
+            logger.info("URL obtida do batch: {}", filePath);
 
-            String downloadFileName = filePath.substring(filePath.lastIndexOf('/') + 1);
-            logger.info("Nome do arquivo para download: {}", downloadFileName);
+            String key = extractS3Key(filePath);
+            logger.info("Chave S3 extraída: {}", key);
 
-            ResponseInputStream<GetObjectResponse> responseInputStream = fetchVideoFromS3Internal(filePath);
-            long contentLength = responseInputStream.response().contentLength();
-            InputStreamResource resource = new InputStreamResource(responseInputStream);
+            String downloadFileName = key.substring(key.lastIndexOf('/') + 1);
+            logger.info("Nome do arquivo: {}", downloadFileName);
 
-            logger.info("Arquivo de vídeo do S3 retornado com sucesso para batchProcessId: {}", rawBatchProcessId);
+            GetObjectRequest request = GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(key)
+                    .build();
+
+            ResponseInputStream<GetObjectResponse> response = s3Client.getObject(request);
+            long contentLength = response.response().contentLength();
+            InputStreamResource resource = new InputStreamResource(response);
 
             HttpHeaders headers = new HttpHeaders();
             headers.add(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + downloadFileName + "\"");
@@ -99,107 +108,112 @@ public class VideoDownloadService {
             videoDownloadMetrics.recordDownloadDuration(timer);
             videoDownloadMetrics.addDownloadedFileSize(contentLength);
 
-            saveDownloadRecord(batch, downloadFileName); 
+            savedDownload = saveDownloadRecord(batch, downloadFileName);
+
+            if (savedDownload != null) {
+                videoStatusManagerService.updateEntityStatus(videoDownloadRepository, savedDownload.getId(), VideoStatusEnum.COMPLETED, "VideoDownloadService");
+            } else {
+                logger.warn("Registro de download não foi salvo, impossível atualizar status para COMPLETED.");
+            }
 
             return new ResponseEntity<>(resource, headers, HttpStatus.OK);
 
         } catch (ProcessedFileNotFoundException e) {
+            logger.error("Arquivo não encontrado para batchProcessId {}: {}", rawBatchProcessId, e.getMessage());
+            if (savedDownload != null) {
+                videoStatusManagerService.updateEntityStatus(videoDownloadRepository, savedDownload.getId(), VideoStatusEnum.ERROR, "ProcessedFileNotFoundException");
+            } else {
+                updateErrorStatus(rawBatchProcessId, "ProcessedFileNotFoundException");
+            }
             videoDownloadMetrics.incrementFailedDownloads();
             videoDownloadMetrics.recordDownloadDuration(timer);
-            logger.error("Erro ao acessar o arquivo no S3 para o caminho do lote {}. Erro: {}", rawBatchProcessId,
-                    e.getMessage());
             throw e;
+
         } catch (Exception e) {
+            logger.error("Erro inesperado no download para batchProcessId {}: {}", rawBatchProcessId, e.getMessage(), e);
+            if (savedDownload != null) {
+                videoStatusManagerService.updateEntityStatus(videoDownloadRepository, savedDownload.getId(), VideoStatusEnum.ERROR, "UnexpectedError");
+            } else {
+                updateErrorStatus(rawBatchProcessId, "UnexpectedError");
+            }
             videoDownloadMetrics.incrementFailedDownloads();
             videoDownloadMetrics.recordDownloadDuration(timer);
-            logger.error("Erro inesperado durante o download do vídeo para o lote {}. Erro: {}", rawBatchProcessId,
-                    e.getMessage(), e);
             throw new RuntimeException("Erro interno ao processar o download do vídeo.", e);
         }
     }
 
-    private ResponseInputStream<GetObjectResponse> fetchVideoFromS3Internal(String filePath) {
-        logger.info("Iniciando fetchVideoFromS3Internal para o caminho: {}", filePath);
-        String key = filePath;
 
-        if (filePath != null && filePath.startsWith("https://")) {
-            try {
-                URI uri = URI.create(filePath);
-                String path = uri.getPath();
-                if (path.startsWith("/")) {
-                    key = path.substring(1);
-                }
-                if (key.startsWith(bucketName + "/")) {
-                    key = key.substring(bucketName.length() + 1);
-                } else if (filePath.contains(".s3.amazonaws.com/")) {
-                    key = filePath.substring(filePath.indexOf(".s3.amazonaws.com/") + ".s3.amazonaws.com/".length());
-                } else if (filePath.contains(bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/")) {
-                    key = filePath
-                            .substring(filePath.indexOf(bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/")
-                                    + (bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/").length());
-                }
-                if (key.startsWith("/")) {
-                    key = key.substring(1);
-                }
-
-                logger.info("Chave S3 extraída do URL: {}", key);
-            } catch (Exception e) {
-                logger.error("Erro ao processar o URL do S3: {}", e.getMessage(), e);
-                throw new ProcessedFileNotFoundException("Erro ao processar o URL do S3.", e);
-            }
-        }
-
-        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
-                .bucket(bucketName)
-                .key(key)
-                .build();
-
+    private String extractS3Key(String filePath) {
         try {
-            logger.info("Fazendo requisição para obter objeto do S3: bucket={}, key={}", bucketName, key);
-            return s3Client.getObject(getObjectRequest);
+            if (filePath == null || filePath.isBlank()) {
+                throw new ProcessedFileNotFoundException("URL do S3 vazia ou nula.");
+            }
+
+            String cleanUrl = filePath.split("\\?")[0];
+
+            URI uri = URI.create(cleanUrl);
+            String path = uri.getPath();
+            String key = path.startsWith("/") ? path.substring(1) : path;
+
+            if (key.startsWith(bucketName + "/")) {
+                key = key.substring(bucketName.length() + 1);
+            }
+
+            if (cleanUrl.contains(".s3.amazonaws.com/")) {
+                key = cleanUrl.substring(cleanUrl.indexOf(".s3.amazonaws.com/") + ".s3.amazonaws.com/".length());
+            } else if (cleanUrl.contains(bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/")) {
+                key = cleanUrl.substring(
+                        cleanUrl.indexOf(bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/") +
+                                (bucketName + ".s3." + Region.US_EAST_1.id() + ".amazonaws.com/").length());
+            }
+
+            return key.startsWith("/") ? key.substring(1) : key;
+
         } catch (Exception e) {
-            logger.error("Erro ao obter objeto do S3 (bucket={}, key={}): {}", bucketName, key, e.getMessage(), e);
-            throw new ProcessedFileNotFoundException("Erro ao acessar o arquivo no S3.", e);
+            logger.error("Falha ao extrair a chave do S3 da URL: {}", filePath, e);
+            throw new ProcessedFileNotFoundException("Erro ao processar a URL do S3.", e);
+        }
+    }
+
+    private VideoDownload saveDownloadRecord(VideoProcessingBatch batch, String fileName) {
+        try {
+            if (batch == null || fileName == null || fileName.isBlank()) return null;
+
+            VideoDownload download = new VideoDownload();
+            download.setVideoProcessingBatch(batch);
+            download.setDownloadFileName(fileName);
+            download.setCreatedTimes(ZonedDateTime.now());
+            download.setUpdatedTimes(ZonedDateTime.now());
+            download.setStatus(VideoStatusEnum.PROCESSING);
+            download.setS3Url(batch.getS3Url());
+            download.setRetryCount(0);
+            download.setUserAccount(batch.getUserAccount());
+
+            VideoDownload savedDownload = videoDownloadRepository.save(download);
+            logger.info("Download registrado com sucesso: {}", savedDownload.getId());
+
+            videoDownloadProducer.sendDownloadId(savedDownload.getId());
+
+            return savedDownload; 
+        } catch (Exception e) {
+            logger.error("Erro ao registrar download no banco: {}", e.getMessage(), e);
+            throw new RuntimeException("Falha ao registrar download.", e);
+        }
+    }
+
+    private void updateErrorStatus(String batchId, String source) {
+        try {
+            VideoProcessingBatch batch = videoProcessingBatchFinderService.findById(batchId);
+            videoStatusManagerService.updateEntityStatus(videoDownloadRepository, batch.getId(), VideoStatusEnum.ERROR, source);
+        } catch (Exception e) {
+            logger.error("Erro ao atualizar status de erro para batchId {}: {}", batchId, e.getMessage(), e);
         }
     }
 
     private String detectMimeType(String filename) {
-        if (filename.endsWith(".mp4"))
-            return "video/mp4";
-        if (filename.endsWith(".avi"))
-            return "video/avi";
-        if (filename.endsWith(".mov"))
-            return "video/quicktime";
+        if (filename.endsWith(".mp4")) return "video/mp4";
+        if (filename.endsWith(".avi")) return "video/avi";
+        if (filename.endsWith(".mov")) return "video/quicktime";
         return "application/octet-stream";
     }
-
-    private void saveDownloadRecord(VideoProcessingBatch batch, String downloadFileName) {
-        try {
-            if (batch == null || downloadFileName == null || downloadFileName.isBlank()) {
-                logger.warn("Batch ou nome do arquivo de download inválido. Ignorando persistência.");
-                return;
-            }
-
-            logger.info("Salvando registro de download no banco para batchProcessId: {}", batch.getId());
-
-            VideoDownload download = new VideoDownload();
-            download.setVideoProcessingBatch(batch);
-            download.setDownloadFileName(downloadFileName);
-            download.setCreatedTimes(ZonedDateTime.now());
-            download.setUpdatedTimes(ZonedDateTime.now());
-            download.setStatus(VideoStatusEnum.PROCESSING);
-            download.setVideoFilePath(batch.getVideoFilePath());
-            download.setRetryCount(0);
-            download.setUserAccount(batch.getUserAccount());
-
-            videoDownloadRepository.save(download);
-            logger.info("Registro de download salvo com sucesso: {}", download.getId());
-
-            videoDownloadProducer.sendDownloadId(download.getId());
-
-        } catch (Exception e) {
-            logger.error("Erro ao salvar registro de download no banco: {}", e.getMessage(), e);
-        }
-    }
-
 }

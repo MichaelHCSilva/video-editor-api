@@ -12,9 +12,6 @@ import org.springframework.messaging.handler.annotation.Payload;
 import org.springframework.stereotype.Service;
 
 import com.l8group.videoeditor.config.RabbitMQConfig;
-import com.l8group.videoeditor.enums.VideoStatusEnum; // Importar o enum
-import com.l8group.videoeditor.repositories.VideoDownloadRepository; // Importar o repositório
-import com.l8group.videoeditor.services.VideoStatusManagerService; // Importar o serviço de gerenciamento de status
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 
 @Service
@@ -25,52 +22,22 @@ public class VideoDownloadConsumer extends AbstractRetryConsumer {
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
-    @Autowired 
-    private VideoStatusManagerService videoStatusManagerService;
-
-    @Autowired 
-    private VideoDownloadRepository videoDownloadRepository;
-
-    public VideoDownloadConsumer() {
-        
-    }
+    public VideoDownloadConsumer() {}
 
     @RabbitListener(queues = RabbitMQConfig.VIDEO_DOWNLOAD_QUEUE)
     public void processVideoDownload(@Payload String downloadIdStr, Message<?> message) {
         executeWithRetry(() -> {
-            UUID downloadId = null; 
             try {
-                downloadId = UUID.fromString(downloadIdStr);
-
-                logger.info("Iniciando processamento assíncrono final para download com ID: {}", downloadId);
-
-                videoStatusManagerService.updateEntityStatus(
-                    videoDownloadRepository,
-                    downloadId,
-                    VideoStatusEnum.COMPLETED, 
-                    "VideoDownloadConsumer"
-                );
-
-                logger.info("Download de vídeo com ID {} processado com sucesso e status atualizado para COMPLETED. Última atualização: {}", downloadId, LocalDateTime.now());
-
+                UUID downloadId = UUID.fromString(downloadIdStr);
+                logger.info("Download de vídeo {} processado com sucesso. Status atualizado às: {}", downloadId, LocalDateTime.now());
             } catch (IllegalArgumentException e) {
-                logger.error("Erro ao converter UUID para evento de download: String '{}' não é um UUID válido. Detalhes: {}", downloadIdStr, e.getMessage());
+                logger.error("Erro ao converter UUID: String '{}' não é um UUID válido. Detalhes: {}", downloadIdStr, e.getMessage());
                 rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_DOWNLOAD_DLQ, downloadIdStr);
-                throw new RuntimeException("Erro irrecuperável: ID de download inválido. Mensagem movida para DLQ.", e);
+                throw new RuntimeException("Erro no processamento do download de vídeo: " + e.getMessage(), e);
             } catch (Exception e) {
-                logger.error("Erro inesperado ao processar download de vídeo com ID '{}'. Detalhes: {}", downloadIdStr, e.getMessage());
-
-                if (downloadId != null) {
-                    videoStatusManagerService.updateEntityStatus(
-                        videoDownloadRepository,
-                        downloadId,
-                        VideoStatusEnum.ERROR, 
-                        "VideoDownloadConsumer"
-                    );
-                }
-
+                logger.error("Erro ao processar download de vídeo com ID '{}'. Detalhes: {}", downloadIdStr, e.getMessage());
                 rabbitTemplate.convertAndSend(RabbitMQConfig.VIDEO_DOWNLOAD_DLQ, downloadIdStr);
-                throw new RuntimeException("Falha no processamento do evento de download: " + e.getMessage(), e);
+                throw new RuntimeException("Erro no processamento do download de vídeo: " + e.getMessage(), e);
             }
         });
     }

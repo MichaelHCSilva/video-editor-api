@@ -3,6 +3,7 @@ package com.l8group.videoeditor.services;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.UUID;
 
 import org.apache.commons.io.FilenameUtils;
@@ -10,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import com.l8group.videoeditor.s3.S3SignedUrlService;
 
 import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.core.sync.RequestBody;
@@ -23,18 +26,25 @@ public class VideoS3Service {
     private static final Logger logger = LoggerFactory.getLogger(VideoS3Service.class);
 
     private final S3Client s3Client;
+    private final S3SignedUrlService s3SignedUrlService;
 
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
 
+     @Value("${aws.s3.signed-url.expiration-minutes}")
+    private long signedUrlExpirationMinutes;
+
     public static final String RAW_VIDEO_FOLDER = "raw-videos/";
     public static final String PROCESSED_VIDEO_FOLDER = "processed-videos/";
 
-    public VideoS3Service() {
+    public VideoS3Service(S3SignedUrlService s3SignedUrlService) {
         this.s3Client = S3Client.builder()
                 .region(Region.US_EAST_1)
-                .credentialsProvider(ProfileCredentialsProvider.create("editor-video-s3"))
-                .build();
+                .credentialsProvider(ProfileCredentialsProvider.builder()
+                .profileName("editor-video-s3")
+                .build())
+            .build();
+        this.s3SignedUrlService = s3SignedUrlService;
     }
 
     public String uploadRawFile(File file, String fileName, UUID videoId) throws IOException {
@@ -95,21 +105,24 @@ public class VideoS3Service {
 
             s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(fileInputStream, file.length()));
             logger.info("Upload realizado com sucesso para: {}", fullKey);
-            return getFileUrl(folder, s3Key);
+
+
+
+             return s3SignedUrlService.generateSignedUrl(bucketName, fullKey, Duration.ofMinutes(signedUrlExpirationMinutes));
         } catch (S3Exception e) {
             logger.error("Erro no upload para o S3. Arquivo: {}", fullKey, e);
             throw new IOException("Falha ao enviar o arquivo para o S3.", e);
         }
     }
 
-    private String getFileUrl(String folder, String fileName) {
+   /* private String getFileUrl(String folder, String fileName) {
         String fullKey = folder + fileName;
         GetUrlRequest getUrlRequest = GetUrlRequest.builder()
                 .bucket(bucketName)
                 .key(fullKey)
                 .build();
         return s3Client.utilities().getUrl(getUrlRequest).toString();
-    }
+    }*/
 
     private String getContentType(String filename) {
         if (filename.endsWith(".mp4")) return "video/mp4";

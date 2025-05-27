@@ -25,8 +25,8 @@ public class VideoProcessingBatch {
     @JoinColumn(name = "video_file_id", nullable = false)
     private VideoFile videoFile;
 
-    @Column(name = "video_file_path", nullable = true)
-    private String videoFilePath;
+    @Column(name = "s3_url", columnDefinition = "TEXT", nullable = true)
+    private String s3Url;
 
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)

@@ -12,7 +12,7 @@ import com.l8group.videoeditor.requests.VideoResizeRequest;
 import com.l8group.videoeditor.utils.VideoFileNameGenerator;
 import com.l8group.videoeditor.utils.VideoFileStorageUtils;
 import com.l8group.videoeditor.utils.VideoProcessorUtils;
-import com.l8group.videoeditor.validation.VideoResizeValidator;
+import com.l8group.videoeditor.validation.VideoResizeValidation;
 
 //import io.micrometer.core.instrument.Metrics;
 import io.micrometer.core.instrument.Timer;
@@ -41,7 +41,7 @@ public class VideoResizeService {
     private final VideoResizeMetrics videoResizeMetrics;
     private final VideoFileFinderService videoFileFinderService;
     private final Validator validator;
-    private final VideoStatusManagerService videoStatusManagerService;
+    private final VideoStatusService videoStatusManagerService;
 
     @Value("${video.temp.dir}")
     private String tempDir;
@@ -64,7 +64,7 @@ public class VideoResizeService {
         }
 
         log.debug("[resizeVideo] Validando dimensões permitidas...");
-        VideoResizeValidator.validate(request.getWidth(), request.getHeight());
+        VideoResizeValidation.validate(request.getWidth(), request.getHeight());
 
         log.debug("[resizeVideo] Buscando vídeo no banco de dados...");
         VideoFile videoFile = videoFileFinderService.findById(request.getVideoId());

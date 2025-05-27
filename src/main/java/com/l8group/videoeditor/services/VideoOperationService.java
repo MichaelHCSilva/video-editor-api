@@ -5,7 +5,7 @@ import com.l8group.videoeditor.exceptions.InvalidCutTimeException;
 import com.l8group.videoeditor.exceptions.InvalidResizeParameterException;
 import com.l8group.videoeditor.models.VideoFile;
 import com.l8group.videoeditor.requests.*;
-import com.l8group.videoeditor.validation.VideoResizeValidator;
+import com.l8group.videoeditor.validation.VideoResizeValidation;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class VideoOperationExecutor {
+public class VideoOperationService {
 
     private final VideoCutService videoCutService;
     private final VideoResizeService videoResizeService;
@@ -94,7 +94,7 @@ public class VideoOperationExecutor {
                         Integer height = parseInteger(operation.getParameters().getHeight());
                         log.debug("[validateAllOperations] RESIZE params: width={}, height={}", width, height);
                         validateRequest(new VideoResizeRequest(videoId, width, height));
-                        VideoResizeValidator.validate(width, height);
+                        VideoResizeValidation.validate(width, height);
                     }
                     case "OVERLAY" -> {
                         log.debug("[validateAllOperations] OVERLAY params: text={}, position={}, fontSize={}",
@@ -186,7 +186,7 @@ public class VideoOperationExecutor {
         Integer width = parseInteger(parameters.getWidth());
         Integer height = parseInteger(parameters.getHeight());
 
-        VideoResizeValidator.validate(width, height);
+        VideoResizeValidation.validate(width, height);
         VideoResizeRequest request = new VideoResizeRequest(videoId, width, height);
         return videoResizeService.resizeVideo(request, inputPath);
     }
